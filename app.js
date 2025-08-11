@@ -7,6 +7,13 @@ require('dotenv').config({ path: './config.env' });
 const db = require('./config/database');
 const redis = require('./config/redis');
 const User = require('./models/User');
+const redisService = require('./services/redisService');
+const Laptop = require('./models/Laptop');
+const Monitor = require('./models/Monitor');
+const Printer = require('./models/Printer');
+const Projector = require('./models/Projector');
+const Tool = require('./models/Tool');
+const Phone = require('./models/Phone');
 
 const app = express();
 app.use(express.json({ limit: '2mb' }));
@@ -43,6 +50,32 @@ async function start() {
   await db.connect();
   await redis.connect();
 
+  async function syncUserDenormalizedData(userDoc) {
+    try {
+      if (!userDoc || !userDoc._id) return;
+      const fullName = userDoc.fullname || userDoc.fullName || userDoc.name || '';
+      const updateCurrentHolder = {
+        'currentHolder.fullname': fullName,
+        'currentHolder.jobTitle': userDoc.jobTitle || userDoc.designation || '',
+        'currentHolder.department': userDoc.department || '',
+        'currentHolder.avatarUrl': userDoc.avatarUrl || '',
+      };
+      const models = [Laptop, Monitor, Printer, Projector, Tool, Phone];
+      for (const Model of models) {
+        // Update currentHolder
+        await Model.updateMany({ 'currentHolder.id': userDoc._id }, { $set: updateCurrentHolder });
+        // Update assignmentHistory.userName via arrayFilters
+        await Model.updateMany(
+          { 'assignmentHistory.user': userDoc._id },
+          { $set: { 'assignmentHistory.$[elem].userName': fullName } },
+          { arrayFilters: [{ 'elem.user': userDoc._id }] }
+        );
+      }
+    } catch (e) {
+      console.warn('[Inventory Service] syncUserDenormalizedData warning:', e.message);
+    }
+  }
+
   // Subscribe to user events from primary Redis
   const userChannel = process.env.REDIS_USER_CHANNEL || 'user_events';
   await redis.subscribe(userChannel, async (message) => {
@@ -56,7 +89,9 @@ async function start() {
         case 'user_created':
         case 'user_updated':
           if (payload) {
-            await User.updateFromFrappe(payload);
+            const updated = await User.updateFromFrappe(payload);
+            await syncUserDenormalizedData(updated);
+            await redisService.deleteAllDeviceCache();
           }
           break;
         case 'user_deleted':
@@ -64,6 +99,7 @@ async function start() {
             const identifier = payload?.email || message.user_id || message.name;
             if (identifier) {
               await User.deleteOne({ $or: [{ email: identifier }, { frappeUserId: identifier }] });
+              await redisService.deleteAllDeviceCache();
             }
           }
           break;
@@ -81,7 +117,11 @@ async function start() {
       if (!message || typeof message !== 'object' || !message.type) return;
       const payload = message.user || message.data || null;
       if (message.type === 'user_created' || message.type === 'user_updated') {
-        if (payload) await User.updateFromFrappe(payload);
+        if (payload) {
+          const updated = await User.updateFromFrappe(payload);
+          await syncUserDenormalizedData(updated);
+          await redisService.deleteAllDeviceCache();
+        }
       }
     } catch (err) {
       console.error('[Inventory Service] (secondary) Failed handling user event:', err.message);
