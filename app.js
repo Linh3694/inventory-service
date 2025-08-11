@@ -32,6 +32,7 @@ app.use('/api/inventory/laptops', require('./routes/Inventory/laptops'));
 app.use('/api/inventory/monitors', require('./routes/Inventory/monitors'));
 app.use('/api/inventory/printers', require('./routes/Inventory/printers'));
 app.use('/api/inventory/projectors', require('./routes/Inventory/projectors'));
+  app.use('/api/inventory/phones', require('./routes/Inventory/phones'));
 app.use('/api/inventory/tools', require('./routes/Inventory/tool'));
 app.use('/api/inventory/inspect', require('./routes/Inventory/inspect'));
 app.use('/api/inventory/activity', require('./routes/Inventory/activityRoutes'));

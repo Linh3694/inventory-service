@@ -40,7 +40,13 @@ class RedisClient {
       const frappeDb = process.env.FRAPPE_REDIS_DB ? Number(process.env.FRAPPE_REDIS_DB) : undefined;
       if (frappeUrl || frappeHost) {
         try {
-          const secondaryOpts = frappeUrl ? { url: frappeUrl } : { socket: { host: frappeHost || '127.0.0.1', port: frappePort || 13000 }, password: frappePassword, database: frappeDb };
+          const secondaryOpts = frappeUrl
+            ? { url: frappeUrl }
+            : {
+                socket: { host: frappeHost || '127.0.0.1', port: frappePort || 13001 },
+                password: frappePassword,
+                database: frappeDb,
+              };
           this.secondarySubClient = createClient(secondaryOpts);
           this.secondarySubClient.on('error', (e) => console.error('[Inventory Service] Redis secondary-sub error:', e.message));
           await this.secondarySubClient.connect();
