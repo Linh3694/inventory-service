@@ -224,6 +224,73 @@ exports.updateLaptopStatus = async (req, res) => {
   }
 };
 
+// Bulk upload laptops
+exports.bulkUploadLaptops = async (req, res) => {
+  try {
+    const { laptops } = req.body;
+    if (!laptops || !Array.isArray(laptops) || laptops.length === 0) {
+      return res.status(400).json({ message: 'Không có dữ liệu hợp lệ để tải lên!' });
+    }
+
+    const errors = [];
+    const validDocs = [];
+
+    for (const laptop of laptops) {
+      try {
+        // Normalize and validate fields
+        laptop.room = laptop.room && mongoose.Types.ObjectId.isValid(laptop.room) ? laptop.room : null;
+        laptop.status = ['Active', 'Standby', 'Broken', 'PendingDocumentation'].includes(laptop.status)
+          ? laptop.status
+          : 'Standby';
+
+        if (laptop.assigned && Array.isArray(laptop.assigned) && laptop.assigned.length > 0) {
+          const looksLikeId = mongoose.Types.ObjectId.isValid(laptop.assigned[0]);
+          if (looksLikeId) {
+            const validIds = await User.find({ _id: { $in: laptop.assigned } }).select('_id');
+            if (validIds.length !== laptop.assigned.length) {
+              throw new Error('Một số ID người dùng không tồn tại trong hệ thống.');
+            }
+          } else {
+            // Map from fullnames to user ids
+            const assignedIds = await Promise.all(
+              laptop.assigned.map(async (fullname) => {
+                const user = await User.findOne({ fullname: fullname.trim() }).select('_id');
+                if (!user) throw new Error(`Người dùng "${fullname}" không tồn tại trong hệ thống.`);
+                return user._id;
+              })
+            );
+            laptop.assigned = assignedIds;
+          }
+        }
+
+        if (!laptop.name || !laptop.serial) {
+          errors.push({ serial: laptop.serial || 'Không xác định', message: 'Thông tin laptop không hợp lệ (thiếu tên, serial).' });
+          continue;
+        }
+
+        const existing = await Laptop.findOne({ serial: laptop.serial });
+        if (existing) {
+          errors.push({ serial: laptop.serial, name: laptop.name, message: `Serial ${laptop.serial} đã tồn tại.` });
+          continue;
+        }
+
+        validDocs.push(laptop);
+      } catch (err) {
+        errors.push({ serial: laptop.serial || 'Không xác định', message: err.message || 'Lỗi không xác định khi xử lý laptop.' });
+      }
+    }
+
+    if (validDocs.length > 0) {
+      await Laptop.insertMany(validDocs);
+    }
+
+    return res.status(201).json({ message: 'Thêm mới hàng loạt thành công!', addedLaptops: validDocs.length, errors });
+  } catch (error) {
+    console.error('Lỗi khi thêm mới hàng loạt laptops:', error.message);
+    return res.status(500).json({ message: 'Lỗi khi thêm mới hàng loạt', error: error.message });
+  }
+};
+
 exports.searchLaptops = async (req, res) => {
   try {
     const { query } = req.query;
