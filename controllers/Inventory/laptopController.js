@@ -58,7 +58,7 @@ exports.getLaptops = async (req, res) => {
       const laptopIds = laptops.map((l) => l._id);
       const populated = await Laptop.find({ _id: { $in: laptopIds } })
         .populate('assigned', 'fullname jobTitle department avatarUrl')
-        .populate('room', 'name location status')
+        .populate('room', 'name room_number building floor block status')
         .populate('assignmentHistory.user', 'fullname email jobTitle avatarUrl')
         .populate('assignmentHistory.assignedBy', 'fullname email title')
         .populate('assignmentHistory.revokedBy', 'fullname email')
@@ -71,7 +71,7 @@ exports.getLaptops = async (req, res) => {
         .skip(skip)
         .limit(limit)
         .populate('assigned', 'fullname jobTitle department avatarUrl')
-        .populate('room', 'name location status')
+        .populate('room', 'name room_number building floor block status')
         .populate('assignmentHistory.user', 'fullname email jobTitle avatarUrl')
         .populate('assignmentHistory.assignedBy', 'fullname email title')
         .populate('assignmentHistory.revokedBy', 'fullname email')
@@ -79,7 +79,10 @@ exports.getLaptops = async (req, res) => {
     }
     const populatedLaptops = laptops.map((l) => ({
       ...l,
-      room: l.room ? { ...l.room, location: l.room.location?.map((loc) => `${loc.building}, tầng ${loc.floor}`) || ['Không xác định'] } : { name: 'Không xác định', location: ['Không xác định'] },
+      room: l.room ? {
+        ...l.room,
+        location: l.room.getDisplayLocation ? [l.room.getDisplayLocation()] : ['Không xác định']
+      } : { name: 'Không xác định', location: ['Không xác định'] },
     }));
     if (!hasFilters) {
       await redisService.setDevicePage('laptop', page, limit, populatedLaptops, totalItems, 300);

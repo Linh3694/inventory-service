@@ -14,6 +14,7 @@ const Printer = require('./models/Printer');
 const Projector = require('./models/Projector');
 const Tool = require('./models/Tool');
 const Phone = require('./models/Phone');
+const Room = require('./models/Room');
 
 const app = express();
 app.use(express.json({ limit: '2mb' }));
@@ -79,6 +80,7 @@ async function start() {
   // Subscribe to user events from primary Redis
   const userChannel = process.env.REDIS_USER_CHANNEL || 'user_events';
   console.log(`[Inventory Service] Subscribing to Redis channel: ${userChannel}`);
+
   await redis.subscribe(userChannel, async (message) => {
     try {
       // Always log user events for debugging
@@ -111,11 +113,77 @@ async function start() {
             }
           }
           break;
+        case 'room_created':
+        case 'room_updated':
+          if (payload) {
+            console.log('[Inventory Service] Processing room:', payload.name || payload.room_name);
+            try {
+              const room = await Room.syncFromFrappe(payload);
+              console.log('[Inventory Service] Room synced:', room.name);
+              await redisService.deleteAllDeviceCache(); // Clear cache vì room data changed
+            } catch (dbError) {
+              console.error('[Inventory Service] Room sync error:', dbError.message);
+            }
+          }
+          break;
+        case 'room_deleted':
+          if (payload) {
+            const roomId = payload.name || payload.room_id;
+            if (roomId) {
+              console.log('[Inventory Service] Deleting room:', roomId);
+              await Room.deleteOne({ frappeRoomId: roomId });
+              await redisService.deleteAllDeviceCache();
+            }
+          }
+          break;
         default:
           break;
       }
     } catch (err) {
       console.error('[Inventory Service] Failed handling user event:', err.message);
+    }
+  });
+
+  // Subscribe to room events
+  await redis.subscribe(roomChannel, async (message) => {
+    try {
+      console.log('[Inventory Service] Room event received:', message?.type, 'from:', message?.source);
+      if (!message || typeof message !== 'object' || !message.type) return;
+
+      const payload = message.room || message.data || null;
+
+      switch (message.type) {
+        case 'room_created':
+        case 'room_updated':
+          if (payload) {
+            console.log('[Inventory Service] Processing room:', payload.name || payload.room_name);
+            try {
+              const room = await Room.syncFromFrappe(payload);
+              console.log('[Inventory Service] Room synced:', room.name);
+              await redisService.deleteAllDeviceCache(); // Clear cache vì room data changed
+            } catch (dbError) {
+              console.error('[Inventory Service] Room sync error:', dbError.message);
+            }
+          }
+          break;
+        case 'room_deleted':
+          if (payload) {
+            const roomId = payload.name || payload.room_id;
+            if (roomId) {
+              console.log('[Inventory Service] Deleting room:', roomId);
+              await Room.deleteOne({ frappeRoomId: roomId });
+              await redisService.deleteAllDeviceCache();
+            }
+          }
+          break;
+        case 'room_events_ping':
+          console.log('[Inventory Service] Room events ping received');
+          break;
+        default:
+          break;
+      }
+    } catch (err) {
+      console.error('[Inventory Service] Failed handling room event:', err.message);
     }
   });
 
