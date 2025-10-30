@@ -1,11 +1,65 @@
 const jwt = require('jsonwebtoken');
+const axios = require('axios');
+
+// Frappe API configuration
+const FRAPPE_API_URL = process.env.FRAPPE_API_URL || 'https://admin.sis.wellspring.edu.vn';
 
 // Helper: trích xuất userId linh hoạt từ token (tương thích đa nguồn)
 function getUserIdFromDecoded(decoded) {
   return decoded?.id || decoded?.userId || decoded?.user || decoded?.name || null;
 }
 
-// Bắt buộc xác thực bằng JWT Bearer
+// Try validating token via Frappe first, then fallback to JWT
+async function resolveFrappeUserByToken(token) {
+  try {
+    const erpResp = await axios.get(
+      `${FRAPPE_API_URL}/api/method/erp.api.erp_common_user.auth.get_current_user`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'X-Frappe-CSRF-Token': token,
+        },
+        timeout: 10000,
+      }
+    );
+    if (erpResp.data?.status === 'success' && erpResp.data.user) {
+      return erpResp.data.user;
+    }
+  } catch (e) {
+    // Fallback to Frappe default
+    try {
+      const loggedResp = await axios.get(
+        `${FRAPPE_API_URL}/api/method/frappe.auth.get_logged_user`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'X-Frappe-CSRF-Token': token,
+          },
+          timeout: 10000,
+        }
+      );
+
+      if (loggedResp.data?.message) {
+        const userResp = await axios.get(
+          `${FRAPPE_API_URL}/api/resource/User/${loggedResp.data.message}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'X-Frappe-CSRF-Token': token,
+            },
+            timeout: 10000,
+          }
+        );
+        return userResp.data?.data || null;
+      }
+    } catch (fallbackErr) {
+      // Will continue to JWT validation
+    }
+  }
+  return null;
+}
+
+// Bắt buộc xác thực - try Frappe first, fallback to JWT
 const authenticate = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -18,8 +72,36 @@ const authenticate = async (req, res, next) => {
     }
 
     const token = authHeader.split(' ')[1];
-    const secret = process.env.JWT_SECRET || 'breakpoint';
 
+    // 1. Try Frappe authentication first
+    let frappeUser = null;
+    try {
+      frappeUser = await resolveFrappeUserByToken(token);
+    } catch (e) {
+      // Continue to JWT validation
+    }
+
+    if (frappeUser) {
+      // Map Frappe user to req.user format
+      req.user = {
+        _id: frappeUser.email || frappeUser.name,
+        id: frappeUser.email || frappeUser.name,
+        name: frappeUser.name || frappeUser.email,
+        fullname: frappeUser.full_name || frappeUser.fullname || frappeUser.name,
+        email: frappeUser.email,
+        role: frappeUser.role || frappeUser.user_role || 'user',
+        roles: frappeUser.frappe_roles || [frappeUser.role] || ['user'],
+        employeeCode: frappeUser.employee_code || null,
+        department: frappeUser.department || null,
+        jobTitle: frappeUser.job_title || null,
+        token,
+        provider: 'frappe'
+      };
+      return next();
+    }
+
+    // 2. Fallback to JWT validation for backward compatibility
+    const secret = process.env.JWT_SECRET || 'breakpoint';
     try {
       const decoded = jwt.verify(token, secret);
       const userId = getUserIdFromDecoded(decoded);
@@ -27,7 +109,7 @@ const authenticate = async (req, res, next) => {
         return res.status(401).json({ success: false, message: 'Invalid token structure', code: 'INVALID_TOKEN' });
       }
 
-      // Không truy vấn DB: gắn thông tin từ token vào req.user
+      // Map JWT decoded to req.user format
       req.user = {
         _id: userId,
         id: userId,
@@ -40,14 +122,15 @@ const authenticate = async (req, res, next) => {
         department: decoded.department || null,
         jobTitle: decoded.jobTitle || decoded.designation || null,
         token,
+        provider: 'jwt'
       };
 
       return next();
-    } catch (error) {
-      if (error.name === 'JsonWebTokenError') {
+    } catch (jwtError) {
+      if (jwtError.name === 'JsonWebTokenError') {
         return res.status(401).json({ success: false, message: 'Invalid token', code: 'INVALID_TOKEN' });
       }
-      if (error.name === 'TokenExpiredError') {
+      if (jwtError.name === 'TokenExpiredError') {
         return res.status(401).json({ success: false, message: 'Token expired', code: 'TOKEN_EXPIRED' });
       }
       return res.status(401).json({ success: false, message: 'Authentication failed', code: 'AUTH_FAILED' });
