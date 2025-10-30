@@ -78,20 +78,28 @@ async function start() {
 
   // Subscribe to user events from primary Redis
   const userChannel = process.env.REDIS_USER_CHANNEL || 'user_events';
+  console.log(`[Inventory Service] Subscribing to Redis channel: ${userChannel}`);
   await redis.subscribe(userChannel, async (message) => {
     try {
-      if (process.env.DEBUG_USER_EVENTS === '1') {
-        console.log('[Inventory Service] User event received:', message?.type);
-      }
+      // Always log user events for debugging
+      console.log('[Inventory Service] User event received:', message?.type, 'from:', message?.source);
       if (!message || typeof message !== 'object' || !message.type) return;
       const payload = message.user || message.data || null;
       switch (message.type) {
         case 'user_created':
         case 'user_updated':
           if (payload) {
-            const updated = await User.updateFromFrappe(payload);
-            await syncUserDenormalizedData(updated);
-            await redisService.deleteAllDeviceCache();
+            console.log('[Inventory Service] Processing user:', payload.email);
+            try {
+              const updated = await User.updateFromFrappe(payload);
+              console.log('[Inventory Service] User updated in DB:', updated.email);
+              await syncUserDenormalizedData(updated);
+              console.log('[Inventory Service] Denormalized data synced');
+              await redisService.deleteAllDeviceCache();
+              console.log('[Inventory Service] Cache cleared');
+            } catch (dbError) {
+              console.error('[Inventory Service] DB update error:', dbError.message);
+            }
           }
           break;
         case 'user_deleted':
