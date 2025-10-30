@@ -117,29 +117,7 @@ async function start() {
             }
           }
           break;
-        case 'room_created':
-        case 'room_updated':
-          if (payload) {
-            console.log('[Inventory Service] Processing room:', payload.name || payload.room_name);
-            try {
-              const room = await Room.syncFromFrappe(payload);
-              console.log('[Inventory Service] Room synced:', room.name);
-              await redisService.deleteAllDeviceCache(); // Clear cache vì room data changed
-            } catch (dbError) {
-              console.error('[Inventory Service] Room sync error:', dbError.message);
-            }
-          }
-          break;
-        case 'room_deleted':
-          if (payload) {
-            const roomId = payload.name || payload.room_id;
-            if (roomId) {
-              console.log('[Inventory Service] Deleting room:', roomId);
-              await Room.deleteOne({ frappeRoomId: roomId });
-              await redisService.deleteAllDeviceCache();
-            }
-          }
-          break;
+        // Note: Room events are handled in the separate room channel subscription below
         default:
           break;
       }
