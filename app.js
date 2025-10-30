@@ -81,6 +81,10 @@ async function start() {
   const userChannel = process.env.REDIS_USER_CHANNEL || 'user_events';
   console.log(`[Inventory Service] Subscribing to Redis channel: ${userChannel}`);
 
+  // Subscribe to room events from primary Redis
+  const roomChannel = process.env.REDIS_ROOM_CHANNEL || 'room_events';
+  console.log(`[Inventory Service] Subscribing to Redis room channel: ${roomChannel}`);
+
   await redis.subscribe(userChannel, async (message) => {
     try {
       // Always log user events for debugging
