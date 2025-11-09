@@ -7,10 +7,12 @@ const FRAPPE_API_URL = process.env.FRAPPE_API_URL || 'https://admin.sis.wellspri
 function formatFrappeRoom(frappeRoom) {
   return {
     frappeRoomId: frappeRoom.name || frappeRoom.room_id,
-    name: frappeRoom.room_name || frappeRoom.name,
-    room_number: frappeRoom.room_number,
-    room_name: frappeRoom.room_name,
-    building: frappeRoom.building,
+    name: frappeRoom.room_name || frappeRoom.title_vn || frappeRoom.name,
+    room_number: frappeRoom.room_number || frappeRoom.short_title,
+    room_name: frappeRoom.room_name || frappeRoom.title_vn,
+    room_name_en: frappeRoom.room_name_en || frappeRoom.title_en,
+    short_title: frappeRoom.short_title,
+    building: frappeRoom.building || frappeRoom.building_id,
     floor: frappeRoom.floor,
     block: frappeRoom.block,
     capacity: frappeRoom.capacity,
