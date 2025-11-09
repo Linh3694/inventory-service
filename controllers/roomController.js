@@ -65,11 +65,11 @@ async function getAllFrappeRooms(token) {
   try {
     console.log('🔍 [Sync] Fetching all rooms from Frappe...');
 
-    // Use custom endpoint để lấy TẤT CẢ rooms (không bị limit 20 như resource API)
+    // Use custom endpoint để lấy TẤT CẢ rooms (không bị limit campus)
     let response;
     try {
       response = await axios.get(
-        `${FRAPPE_API_URL}/api/method/erp.api.erp_administrative.room.get_all_rooms`,
+        `${FRAPPE_API_URL}/api/method/erp.api.erp_administrative.room.get_all_rooms_for_sync`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -78,38 +78,56 @@ async function getAllFrappeRooms(token) {
         }
       );
     } catch (e) {
-      // Fallback to resource API nếu custom endpoint không tồn tại
+      // Fallback to older custom endpoint if new one doesn't exist
       if (e.response?.status === 404) {
-        console.log('⚠️  Custom endpoint not found, using resource API...');
-        response = await axios.get(
-          `${FRAPPE_API_URL}/api/resource/ERP%20Administrative%20Room`,
-          {
-            params: {
-              fields: JSON.stringify(['name', 'room_name', 'room_number', 'building', 'floor', 'block', 'capacity', 'room_type', 'status', 'disabled']),
-              limit_start: 0,
-              limit_page_length: 500
-            },
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'X-Frappe-CSRF-Token': token
+        console.log('⚠️  Sync endpoint not found, trying standard endpoint...');
+        try {
+          response = await axios.get(
+            `${FRAPPE_API_URL}/api/method/erp.api.erp_administrative.room.get_all_rooms`,
+            {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'X-Frappe-CSRF-Token': token
+              }
             }
+          );
+        } catch (e2) {
+          // Final fallback to resource API with pagination
+          if (e2.response?.status === 404) {
+            console.log('⚠️  Custom endpoints not found, using resource API...');
+            response = await axios.get(
+              `${FRAPPE_API_URL}/api/resource/ERP%20Administrative%20Room`,
+              {
+                params: {
+                  fields: JSON.stringify(['name', 'room_name', 'room_number', 'building', 'floor', 'block', 'capacity', 'room_type', 'status', 'disabled']),
+                  limit_start: 0,
+                  limit_page_length: 500
+                },
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'X-Frappe-CSRF-Token': token
+                }
+              }
+            );
+          } else {
+            throw e2;
           }
-        );
+        }
       } else {
         throw e;
       }
     }
 
-    // Handle custom endpoint response format (wraps in 'data' and 'message')
+    // Handle custom endpoint response format
     let rooms = [];
     if (response.data.success && response.data.data) {
       // Custom endpoint format
       rooms = response.data.data;
     } else if (response.data.data) {
-      // Resource API format
+      // Alternative format
       rooms = response.data.data;
     } else if (response.data.message && Array.isArray(response.data.message)) {
-      // Alternative format
+      // Message format
       rooms = response.data.message;
     }
 
