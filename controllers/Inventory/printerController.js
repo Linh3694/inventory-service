@@ -302,4 +302,25 @@ exports.getHandoverReport = async (req, res) => {
   res.sendFile(filePath);
 };
 
+// Get printer statistics
+exports.getPrinterStatistics = async (req, res) => {
+  try {
+    const Printer = require('../../models/Printer');
 
+    // Count printers by status
+    const total = await Printer.countDocuments();
+    const active = await Printer.countDocuments({ status: 'Active' });
+    const standby = await Printer.countDocuments({ status: 'Standby' });
+    const broken = await Printer.countDocuments({ status: 'Broken' });
+
+    res.json({
+      total,
+      active,
+      standby,
+      broken
+    });
+  } catch (error) {
+    console.error('Lỗi getPrinterStatistics:', error);
+    res.status(500).json({ message: 'Đã xảy ra lỗi khi lấy thống kê printer.', error });
+  }
+};

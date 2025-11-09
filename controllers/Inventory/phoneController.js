@@ -263,4 +263,25 @@ exports.updatePhoneStatus = async (req, res) => {
   }
 };
 
+// Get phone statistics
+exports.getPhoneStatistics = async (req, res) => {
+  try {
+    const Phone = require('../../models/Phone');
 
+    // Count phones by status
+    const total = await Phone.countDocuments();
+    const active = await Phone.countDocuments({ status: 'Active' });
+    const standby = await Phone.countDocuments({ status: 'Standby' });
+    const broken = await Phone.countDocuments({ status: 'Broken' });
+
+    res.json({
+      total,
+      active,
+      standby,
+      broken
+    });
+  } catch (error) {
+    console.error('Lỗi getPhoneStatistics:', error);
+    res.status(500).json({ message: 'Đã xảy ra lỗi khi lấy thống kê phone.', error });
+  }
+};

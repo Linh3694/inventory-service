@@ -319,4 +319,25 @@ exports.getHandoverReport = async (req, res) => {
   res.sendFile(filePath);
 };
 
+// Get monitor statistics
+exports.getMonitorStatistics = async (req, res) => {
+  try {
+    const Monitor = require('../../models/Monitor');
 
+    // Count monitors by status
+    const total = await Monitor.countDocuments();
+    const active = await Monitor.countDocuments({ status: 'Active' });
+    const standby = await Monitor.countDocuments({ status: 'Standby' });
+    const broken = await Monitor.countDocuments({ status: 'Broken' });
+
+    res.json({
+      total,
+      active,
+      standby,
+      broken
+    });
+  } catch (error) {
+    console.error('Lỗi getMonitorStatistics:', error);
+    res.status(500).json({ message: 'Đã xảy ra lỗi khi lấy thống kê monitor.', error });
+  }
+};

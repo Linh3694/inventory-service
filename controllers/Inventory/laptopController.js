@@ -416,4 +416,25 @@ exports.fixOldData = async (req, res) => {
   }
 };
 
+// Get laptop statistics
+exports.getLaptopStatistics = async (req, res) => {
+  try {
+    const Laptop = require('../../models/Laptop');
 
+    // Count laptops by status
+    const total = await Laptop.countDocuments();
+    const active = await Laptop.countDocuments({ status: 'Active' });
+    const standby = await Laptop.countDocuments({ status: 'Standby' });
+    const broken = await Laptop.countDocuments({ status: 'Broken' });
+
+    res.json({
+      total,
+      active,
+      standby,
+      broken
+    });
+  } catch (error) {
+    console.error('Lỗi getLaptopStatistics:', error);
+    res.status(500).json({ message: 'Đã xảy ra lỗi khi lấy thống kê laptop.', error });
+  }
+};

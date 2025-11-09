@@ -326,4 +326,25 @@ exports.updateProjectorSpecs = async (req, res) => {
   }
 };
 
+// Get projector statistics
+exports.getProjectorStatistics = async (req, res) => {
+  try {
+    const Projector = require('../../models/Projector');
 
+    // Count projectors by status
+    const total = await Projector.countDocuments();
+    const active = await Projector.countDocuments({ status: 'Active' });
+    const standby = await Projector.countDocuments({ status: 'Standby' });
+    const broken = await Projector.countDocuments({ status: 'Broken' });
+
+    res.json({
+      total,
+      active,
+      standby,
+      broken
+    });
+  } catch (error) {
+    console.error('Lỗi getProjectorStatistics:', error);
+    res.status(500).json({ message: 'Đã xảy ra lỗi khi lấy thống kê projector.', error });
+  }
+};

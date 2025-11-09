@@ -10,12 +10,14 @@ const {
   assignPhone,
   revokePhone,
   updatePhoneStatus,
+  getPhoneStatistics,
 } = require('../../controllers/Inventory/phoneController');
 
 const { authenticateServiceOrUser, optionalAuth } = require('../../middleware/validateToken');
 
 // Public GETs
 router.get('/', optionalAuth, getPhones);
+router.get('/statistics', optionalAuth, getPhoneStatistics);
 router.get('/:id', optionalAuth, getPhoneById);
 
 // Protected writes

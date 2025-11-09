@@ -14,6 +14,7 @@ const {
   getLaptopById,
   updateLaptopSpecs,
   fixOldData,
+  getLaptopStatistics,
 } = require('../../controllers/Inventory/laptopController');
 
 const { authenticate, authenticateServiceOrUser, optionalAuth } = require('../../middleware/validateToken');
@@ -21,6 +22,7 @@ const { upload, processFile } = require('../../middleware/uploadHandover');
 
 // Public/optional auth for GET endpoints
 router.get('/', optionalAuth, getLaptops);
+router.get('/statistics', optionalAuth, getLaptopStatistics);
 router.get('/:id', optionalAuth, getLaptopById);
 
 // Protected write endpoints (user or service token)

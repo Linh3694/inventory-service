@@ -13,6 +13,7 @@ const {
   getHandoverReport,
   getToolById,
   updateToolSpecs,
+  getToolStatistics,
 } = require('../../controllers/Inventory/toolController');
 
 const { authenticateServiceOrUser, optionalAuth } = require('../../middleware/validateToken');
@@ -20,6 +21,7 @@ const { upload, processFile } = require('../../middleware/uploadHandover');
 
 // Public GETs
 router.get('/', optionalAuth, getTools);
+router.get('/statistics', optionalAuth, getToolStatistics);
 router.get('/:id', optionalAuth, getToolById);
 
 // Protected writes

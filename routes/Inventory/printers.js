@@ -13,6 +13,7 @@ const {
   updatePrinterStatus,
   uploadHandoverReport,
   getHandoverReport,
+  getPrinterStatistics,
 } = require('../../controllers/Inventory/printerController');
 
 const { authenticateServiceOrUser, optionalAuth } = require('../../middleware/validateToken');
@@ -20,6 +21,7 @@ const { upload, processFile } = require('../../middleware/uploadHandover');
 
 // Public GETs
 router.get('/', optionalAuth, getPrinters);
+router.get('/statistics', optionalAuth, getPrinterStatistics);
 router.get('/:id', optionalAuth, getPrinterById);
 
 // Protected writes

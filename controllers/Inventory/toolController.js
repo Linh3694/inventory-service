@@ -306,4 +306,25 @@ exports.updateToolSpecs = async (req, res) => {
   }
 };
 
+// Get tool statistics
+exports.getToolStatistics = async (req, res) => {
+  try {
+    const Tool = require('../../models/Tool');
 
+    // Count tools by status
+    const total = await Tool.countDocuments();
+    const active = await Tool.countDocuments({ status: 'Active' });
+    const standby = await Tool.countDocuments({ status: 'Standby' });
+    const broken = await Tool.countDocuments({ status: 'Broken' });
+
+    res.json({
+      total,
+      active,
+      standby,
+      broken
+    });
+  } catch (error) {
+    console.error('Lỗi getToolStatistics:', error);
+    res.status(500).json({ message: 'Đã xảy ra lỗi khi lấy thống kê tool.', error });
+  }
+};
