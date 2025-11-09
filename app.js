@@ -45,9 +45,6 @@ app.use('/api/inventory/tools', require('./routes/Inventory/tool'));
 app.use('/api/inventory/inspect', require('./routes/Inventory/inspect'));
 app.use('/api/inventory/activity', require('./routes/Inventory/activityRoutes'));
 
-// Data fix routes (admin only - should be protected)
-app.use('/api/inventory', require('./routes/fixData'));
-
 // Bootstrap
 async function start() {
   const port = Number(process.env.PORT || 4010);
