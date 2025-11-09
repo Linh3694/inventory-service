@@ -14,6 +14,21 @@ module.exports = {
     out_file: './logs/cron-sync-users-out.log',
     log_file: './logs/cron-sync-users.log',
     time: true
+  }, {
+    name: 'inventory-service-cron-sync-rooms',
+    script: 'scripts/sync-rooms-cron.js',
+    instances: 1,
+    autorestart: true,
+    watch: false,
+    max_memory_restart: '256M',
+    cron_restart: '30 1 * * *', // Chạy hàng ngày lúc 1:30 AM (01:30)
+    env: {
+      NODE_ENV: 'production'
+    },
+    error_file: './logs/cron-sync-rooms-error.log',
+    out_file: './logs/cron-sync-rooms-out.log',
+    log_file: './logs/cron-sync-rooms.log',
+    time: true
   }]
 };
 
