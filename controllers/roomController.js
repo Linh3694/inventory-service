@@ -130,24 +130,37 @@ async function getAllFrappeRooms(token) {
     let rooms = [];
     console.log(`🔍 Parsing response...`);
     console.log(`   - response.data.success: ${response.data.success}`);
-    console.log(`   - response.data.data type: ${Array.isArray(response.data.data) ? 'array' : typeof response.data.data}`);
-    console.log(`   - response.data.message type: ${Array.isArray(response.data.message) ? 'array' : typeof response.data.message}`);
+    console.log(`   - response.data.message type: ${typeof response.data.message}`);
     
-    if (response.data.success && response.data.data) {
-      // Custom endpoint format
-      console.log(`✅ Using custom endpoint format (success + data)`);
+    // Frappe endpoint wraps response in "message" property
+    if (response.data.message && typeof response.data.message === 'object') {
+      if (response.data.message.success && response.data.message.data && Array.isArray(response.data.message.data)) {
+        // Frappe custom endpoint format: response.message.data
+        console.log(`✅ Using Frappe custom endpoint format (message.success + message.data)`);
+        rooms = response.data.message.data;
+      } else if (response.data.message.data && Array.isArray(response.data.message.data)) {
+        // Alternative Frappe format
+        console.log(`✅ Using Frappe message.data array format`);
+        rooms = response.data.message.data;
+      } else if (Array.isArray(response.data.message)) {
+        // Message is directly array
+        console.log(`✅ Using message array format`);
+        rooms = response.data.message;
+      }
+    } else if (response.data.success && response.data.data && Array.isArray(response.data.data)) {
+      // Direct success + data format
+      console.log(`✅ Using direct success + data format`);
       rooms = response.data.data;
     } else if (response.data.data && Array.isArray(response.data.data)) {
-      // Alternative format
-      console.log(`✅ Using data array format`);
+      // Direct data array
+      console.log(`✅ Using direct data array format`);
       rooms = response.data.data;
-    } else if (response.data.message && Array.isArray(response.data.message)) {
-      // Message format
-      console.log(`✅ Using message array format`);
-      rooms = response.data.message;
     } else {
       console.log(`⚠️  No matching format found, checking full response structure`);
       console.log(`   Full response keys:`, Object.keys(response.data));
+      if (response.data.message && typeof response.data.message === 'object') {
+        console.log(`   Message keys:`, Object.keys(response.data.message));
+      }
     }
 
     console.log(`✅ Found ${rooms.length} rooms from Frappe`);
