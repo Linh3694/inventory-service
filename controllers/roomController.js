@@ -69,48 +69,54 @@ async function getAllFrappeRooms(token) {
 
     // Use custom endpoint để lấy TẤT CẢ rooms (không bị limit campus)
     let response;
+    let endpoint = '';
     try {
-      response = await axios.get(
-        `${FRAPPE_API_URL}/api/method/erp.api.erp_administrative.room.get_all_rooms_for_sync`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'X-Frappe-CSRF-Token': token
-          }
+      endpoint = `${FRAPPE_API_URL}/api/method/erp.api.erp_administrative.room.get_all_rooms_for_sync`;
+      console.log(`📡 Trying endpoint: ${endpoint}`);
+      response = await axios.get(endpoint, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-Frappe-CSRF-Token': token
         }
-      );
+      });
+      console.log(`✅ Endpoint responded with status: ${response.status}`);
+      console.log(`📦 Response data:`, JSON.stringify(response.data, null, 2));
     } catch (e) {
       // Fallback to older custom endpoint if new one doesn't exist
+      console.log(`❌ Endpoint failed: ${e.message}`);
       if (e.response?.status === 404) {
         console.log('⚠️  Sync endpoint not found, trying standard endpoint...');
         try {
-          response = await axios.get(
-            `${FRAPPE_API_URL}/api/method/erp.api.erp_administrative.room.get_all_rooms`,
-            {
+          endpoint = `${FRAPPE_API_URL}/api/method/erp.api.erp_administrative.room.get_all_rooms`;
+          console.log(`📡 Trying endpoint: ${endpoint}`);
+          response = await axios.get(endpoint, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'X-Frappe-CSRF-Token': token
+            }
+          });
+          console.log(`✅ Endpoint responded with status: ${response.status}`);
+          console.log(`📦 Response data:`, JSON.stringify(response.data, null, 2));
+        } catch (e2) {
+          // Final fallback to resource API with pagination
+          console.log(`❌ Endpoint failed: ${e2.message}`);
+          if (e2.response?.status === 404) {
+            console.log('⚠️  Custom endpoints not found, using resource API...');
+            endpoint = `${FRAPPE_API_URL}/api/resource/ERP%20Administrative%20Room`;
+            console.log(`📡 Trying endpoint: ${endpoint}`);
+            response = await axios.get(endpoint, {
+              params: {
+                fields: JSON.stringify(['name', 'room_name', 'room_number', 'building', 'floor', 'block', 'capacity', 'room_type', 'status', 'disabled']),
+                limit_start: 0,
+                limit_page_length: 500
+              },
               headers: {
                 'Authorization': `Bearer ${token}`,
                 'X-Frappe-CSRF-Token': token
               }
-            }
-          );
-        } catch (e2) {
-          // Final fallback to resource API with pagination
-          if (e2.response?.status === 404) {
-            console.log('⚠️  Custom endpoints not found, using resource API...');
-            response = await axios.get(
-              `${FRAPPE_API_URL}/api/resource/ERP%20Administrative%20Room`,
-              {
-                params: {
-                  fields: JSON.stringify(['name', 'room_name', 'room_number', 'building', 'floor', 'block', 'capacity', 'room_type', 'status', 'disabled']),
-                  limit_start: 0,
-                  limit_page_length: 500
-                },
-                headers: {
-                  'Authorization': `Bearer ${token}`,
-                  'X-Frappe-CSRF-Token': token
-                }
-              }
-            );
+            });
+            console.log(`✅ Endpoint responded with status: ${response.status}`);
+            console.log(`📦 Response data:`, JSON.stringify(response.data, null, 2));
           } else {
             throw e2;
           }
@@ -122,22 +128,40 @@ async function getAllFrappeRooms(token) {
 
     // Handle custom endpoint response format
     let rooms = [];
+    console.log(`🔍 Parsing response...`);
+    console.log(`   - response.data.success: ${response.data.success}`);
+    console.log(`   - response.data.data type: ${Array.isArray(response.data.data) ? 'array' : typeof response.data.data}`);
+    console.log(`   - response.data.message type: ${Array.isArray(response.data.message) ? 'array' : typeof response.data.message}`);
+    
     if (response.data.success && response.data.data) {
       // Custom endpoint format
+      console.log(`✅ Using custom endpoint format (success + data)`);
       rooms = response.data.data;
-    } else if (response.data.data) {
+    } else if (response.data.data && Array.isArray(response.data.data)) {
       // Alternative format
+      console.log(`✅ Using data array format`);
       rooms = response.data.data;
     } else if (response.data.message && Array.isArray(response.data.message)) {
       // Message format
+      console.log(`✅ Using message array format`);
       rooms = response.data.message;
+    } else {
+      console.log(`⚠️  No matching format found, checking full response structure`);
+      console.log(`   Full response keys:`, Object.keys(response.data));
     }
 
     console.log(`✅ Found ${rooms.length} rooms from Frappe`);
+    if (rooms.length > 0) {
+      console.log(`📋 Sample room: ${JSON.stringify(rooms[0], null, 2)}`);
+    }
 
     return rooms;
   } catch (error) {
     console.error('❌ [Sync] Error fetching rooms:', error.message);
+    if (error.response) {
+      console.error('   Status:', error.response.status);
+      console.error('   Data:', JSON.stringify(error.response.data, null, 2));
+    }
     throw error;
   }
 }
