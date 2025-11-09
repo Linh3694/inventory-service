@@ -36,6 +36,7 @@ app.get('/health', async (req, res) => {
 });
 
 // Inventory routes (protected by user auth or service-to-service token at router level)
+app.use('/api/inventory/user', require('./routes/user'));
 app.use('/api/inventory/laptops', require('./routes/Inventory/laptops'));
 app.use('/api/inventory/monitors', require('./routes/Inventory/monitors'));
 app.use('/api/inventory/printers', require('./routes/Inventory/printers'));
