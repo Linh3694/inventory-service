@@ -65,17 +65,12 @@ async function getAllFrappeRooms(token) {
   try {
     console.log('🔍 [Sync] Fetching all rooms from Frappe...');
 
-    // Try 'ERP Administrative Room' first (actual Frappe doctype)
+    // Use custom endpoint để lấy TẤT CẢ rooms (không bị limit 20 như resource API)
     let response;
     try {
       response = await axios.get(
-        `${FRAPPE_API_URL}/api/resource/ERP%20Administrative%20Room`,
+        `${FRAPPE_API_URL}/api/method/erp.api.erp_administrative.room.get_all_rooms`,
         {
-          params: {
-            fields: JSON.stringify(['name', 'room_name', 'room_number', 'building', 'floor', 'block', 'capacity', 'room_type', 'status', 'disabled']),
-            limit_start: 0,
-            limit_page_length: 500
-          },
           headers: {
             'Authorization': `Bearer ${token}`,
             'X-Frappe-CSRF-Token': token
@@ -83,11 +78,11 @@ async function getAllFrappeRooms(token) {
         }
       );
     } catch (e) {
-      // Fallback to 'Room' if 'ERP Administrative Room' doesn't work
+      // Fallback to resource API nếu custom endpoint không tồn tại
       if (e.response?.status === 404) {
-        console.log('⚠️  ERP Administrative Room not found, trying Room...');
+        console.log('⚠️  Custom endpoint not found, using resource API...');
         response = await axios.get(
-          `${FRAPPE_API_URL}/api/resource/Room`,
+          `${FRAPPE_API_URL}/api/resource/ERP%20Administrative%20Room`,
           {
             params: {
               fields: JSON.stringify(['name', 'room_name', 'room_number', 'building', 'floor', 'block', 'capacity', 'room_type', 'status', 'disabled']),
@@ -105,7 +100,19 @@ async function getAllFrappeRooms(token) {
       }
     }
 
-    const rooms = response.data.data || [];
+    // Handle custom endpoint response format (wraps in 'data' and 'message')
+    let rooms = [];
+    if (response.data.success && response.data.data) {
+      // Custom endpoint format
+      rooms = response.data.data;
+    } else if (response.data.data) {
+      // Resource API format
+      rooms = response.data.data;
+    } else if (response.data.message && Array.isArray(response.data.message)) {
+      // Alternative format
+      rooms = response.data.message;
+    }
+
     console.log(`✅ Found ${rooms.length} rooms from Frappe`);
 
     return rooms;
@@ -195,14 +202,8 @@ exports.debugFetchRooms = async (req, res) => {
     let listResponse;
     try {
       listResponse = await axios.get(
-        `${FRAPPE_API_URL}/api/resource/ERP%20Administrative%20Room`,
+        `${FRAPPE_API_URL}/api/method/erp.api.erp_administrative.room.get_all_rooms`,
         {
-          params: {
-            fields: JSON.stringify(['name', 'room_name', 'room_number', 'building', 'floor', 'block', 'capacity', 'room_type', 'status', 'disabled']),
-            limit_start: 0,
-            limit_page_length: 10,
-            order_by: 'name asc'
-          },
           headers: {
             'Authorization': `Bearer ${token}`,
             'X-Frappe-CSRF-Token': token
@@ -211,8 +212,9 @@ exports.debugFetchRooms = async (req, res) => {
       );
     } catch (e) {
       if (e.response?.status === 404) {
+        console.log('⚠️  Custom endpoint not found, using resource API...');
         listResponse = await axios.get(
-          `${FRAPPE_API_URL}/api/resource/Room`,
+          `${FRAPPE_API_URL}/api/resource/ERP%20Administrative%20Room`,
           {
             params: {
               fields: JSON.stringify(['name', 'room_name', 'room_number', 'building', 'floor', 'block', 'capacity', 'room_type', 'status', 'disabled']),
@@ -231,15 +233,28 @@ exports.debugFetchRooms = async (req, res) => {
       }
     }
 
-    const roomList = listResponse.data.data || [];
-    const totalCount = listResponse.data.total_count || listResponse.data.total;
+    let roomList = [];
+    let totalCount = 0;
+    
+    // Handle custom endpoint response format
+    if (listResponse.data.success && listResponse.data.data) {
+      roomList = listResponse.data.data;
+      totalCount = listResponse.data.meta?.total_count || roomList.length;
+    } else if (listResponse.data.data) {
+      // Resource API format
+      roomList = listResponse.data.data;
+      totalCount = listResponse.data.total_count || listResponse.data.total || roomList.length;
+    } else if (listResponse.data.message && Array.isArray(listResponse.data.message)) {
+      roomList = listResponse.data.message;
+      totalCount = roomList.length;
+    }
 
     console.log(`📦 Found ${roomList.length} rooms (total_count: ${totalCount})`);
 
     const sampleRooms = roomList.slice(0, 5).map(room => ({
       name: room.name,
-      room_name: room.room_name,
-      building: room.building,
+      room_name: room.room_name || room.title_vn || room.name,
+      building: room.building_id || room.building,
       floor: room.floor,
       room_number: room.room_number,
       capacity: room.capacity,
