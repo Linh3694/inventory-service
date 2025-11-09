@@ -82,30 +82,73 @@ async function fixAssignmentHistory() {
 
           // Fix the device
           const updatedDevice = await model.findById(device._id);
+          const fixes = [];
 
-          // Remove entries with null user
+          // Step 1: Remove entries with null user
+          const beforeCount = updatedDevice.assignmentHistory.length;
           updatedDevice.assignmentHistory = updatedDevice.assignmentHistory.filter(
             entry => entry.user !== null && entry.user !== undefined
           );
+          const afterCount = updatedDevice.assignmentHistory.length;
+          if (afterCount < beforeCount) {
+            fixes.push(`Removed ${beforeCount - afterCount} entries with null user`);
+          }
 
-          // Ensure last open entry has proper structure
-          const lastEntry = updatedDevice.assignmentHistory[updatedDevice.assignmentHistory.length - 1];
-          if (lastEntry && !lastEntry.endDate && updatedDevice.assigned?.length > 0) {
-            // This is the current holder
-            if (!lastEntry.user) {
-              lastEntry.user = updatedDevice.assigned[0];
+          // Step 2: Ensure all but last entry have endDate
+          for (let i = 0; i < updatedDevice.assignmentHistory.length - 1; i++) {
+            const entry = updatedDevice.assignmentHistory[i];
+            if (!entry.endDate) {
+              // Set endDate to next entry's startDate or now
+              const nextEntry = updatedDevice.assignmentHistory[i + 1];
+              entry.endDate = nextEntry?.startDate || new Date();
+              fixes.push(`Entry ${i}: Added missing endDate`);
+            }
+          }
+
+          // Step 3: Ensure last entry (current) matches assigned array
+          if (updatedDevice.assignmentHistory.length > 0) {
+            const lastEntry = updatedDevice.assignmentHistory[updatedDevice.assignmentHistory.length - 1];
+            
+            // If device has assigned user, ensure last entry matches
+            if (updatedDevice.assigned?.length > 0) {
+              const currentUserId = updatedDevice.assigned[0];
+              
+              if (!lastEntry.endDate) {
+                // Last entry should be "open" and match assigned
+                if (lastEntry.user?.toString() !== currentUserId.toString()) {
+                  fixes.push(`Entry ${updatedDevice.assignmentHistory.length - 1}: Updated user to match assigned`);
+                  lastEntry.user = currentUserId;
+                }
+              } else {
+                // Last entry has endDate but device still has assigned - mismatch!
+                // Create new entry for current user or close the last one
+                if (lastEntry.user?.toString() !== currentUserId.toString()) {
+                  lastEntry.endDate = null; // Close the end date to reopen it
+                  if (lastEntry.user?.toString() !== currentUserId.toString()) {
+                    lastEntry.user = currentUserId;
+                  }
+                  fixes.push(`Entry ${updatedDevice.assignmentHistory.length - 1}: Reopened for current user`);
+                }
+              }
+            } else {
+              // Device has no assigned user - last entry should be closed
+              if (!lastEntry.endDate) {
+                lastEntry.endDate = new Date();
+                fixes.push(`Entry ${updatedDevice.assignmentHistory.length - 1}: Closed (no assigned user)`);
+              }
             }
           }
 
           await updatedDevice.save();
           fixedDevices++;
-          console.log(`  ✅ Fixed!`);
+          console.log(`  ✅ Fixed! (${fixes.join(', ')})`);
 
           issues.push({
             deviceType: name,
             deviceId: device._id,
             deviceName: device.name,
-            issues: deviceIssues
+            issues: deviceIssues,
+            fixes: fixes
           });
         }
       }
