@@ -1,17 +1,16 @@
 const express = require('express');
 const userController = require('../controllers/userController');
-const { authenticate } = require('../middleware/validateToken');
 
 const router = express.Router();
 
-// 📝 ENDPOINT 1: Manual sync all users (AUTHENTICATED)
-router.post('/sync/manual', authenticate, userController.syncUsersManual);
+// 📝 ENDPOINT 1: Manual sync all users (UNAUTHENTICATED - secured via token in Frappe)
+router.post('/sync/manual', userController.syncUsersManual);
 
-// 🔍 ENDPOINT 2: Test fetch users (AUTHENTICATED)
-router.get('/debug/fetch-users', authenticate, userController.debugFetchUsers);
+// 🔍 ENDPOINT 2: Test fetch users (UNAUTHENTICATED)
+router.get('/debug/fetch-users', userController.debugFetchUsers);
 
-// 📧 ENDPOINT 3: Sync user by email (AUTHENTICATED)
-router.post('/sync/email/:email', authenticate, userController.syncUserByEmail);
+// 📧 ENDPOINT 3: Sync user by email (UNAUTHENTICATED)
+router.post('/sync/email/:email', userController.syncUserByEmail);
 
 // 🔔 ENDPOINT 4: Webhook - User changed in Frappe (NO AUTH)
 router.post('/webhook/frappe-user-changed', userController.webhookUserChanged);
