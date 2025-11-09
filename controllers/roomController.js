@@ -25,15 +25,34 @@ function formatFrappeRoom(frappeRoom) {
 // Fetch room details từ Frappe
 async function getFrappeRoomDetail(roomId, token) {
   try {
-    const response = await axios.get(
-      `${FRAPPE_API_URL}/api/resource/Room/${roomId}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'X-Frappe-CSRF-Token': token
+    // Try 'ERP Administrative Room' first
+    let response;
+    try {
+      response = await axios.get(
+        `${FRAPPE_API_URL}/api/resource/ERP%20Administrative%20Room/${roomId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'X-Frappe-CSRF-Token': token
+          }
         }
+      );
+    } catch (e) {
+      // Fallback to 'Room'
+      if (e.response?.status === 404) {
+        response = await axios.get(
+          `${FRAPPE_API_URL}/api/resource/Room/${roomId}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'X-Frappe-CSRF-Token': token
+            }
+          }
+        );
+      } else {
+        throw e;
       }
-    );
+    }
     return response.data.data;
   } catch (error) {
     console.warn(`⚠️  Failed to fetch room ${roomId}: ${error.message}`);
@@ -46,20 +65,45 @@ async function getAllFrappeRooms(token) {
   try {
     console.log('🔍 [Sync] Fetching all rooms from Frappe...');
 
-    const response = await axios.get(
-      `${FRAPPE_API_URL}/api/resource/Room`,
-      {
-        params: {
-          fields: JSON.stringify(['name', 'room_name', 'room_number', 'building', 'floor', 'block', 'capacity', 'room_type', 'status', 'disabled']),
-          limit_start: 0,
-          limit_page_length: 500
-        },
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'X-Frappe-CSRF-Token': token
+    // Try 'ERP Administrative Room' first (actual Frappe doctype)
+    let response;
+    try {
+      response = await axios.get(
+        `${FRAPPE_API_URL}/api/resource/ERP%20Administrative%20Room`,
+        {
+          params: {
+            fields: JSON.stringify(['name', 'room_name', 'room_number', 'building', 'floor', 'block', 'capacity', 'room_type', 'status', 'disabled']),
+            limit_start: 0,
+            limit_page_length: 500
+          },
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'X-Frappe-CSRF-Token': token
+          }
         }
+      );
+    } catch (e) {
+      // Fallback to 'Room' if 'ERP Administrative Room' doesn't work
+      if (e.response?.status === 404) {
+        console.log('⚠️  ERP Administrative Room not found, trying Room...');
+        response = await axios.get(
+          `${FRAPPE_API_URL}/api/resource/Room`,
+          {
+            params: {
+              fields: JSON.stringify(['name', 'room_name', 'room_number', 'building', 'floor', 'block', 'capacity', 'room_type', 'status', 'disabled']),
+              limit_start: 0,
+              limit_page_length: 500
+            },
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'X-Frappe-CSRF-Token': token
+            }
+          }
+        );
+      } else {
+        throw e;
       }
-    );
+    }
 
     const rooms = response.data.data || [];
     console.log(`✅ Found ${rooms.length} rooms from Frappe`);
@@ -148,21 +192,44 @@ exports.debugFetchRooms = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Token required' });
     }
 
-    const listResponse = await axios.get(
-      `${FRAPPE_API_URL}/api/resource/Room`,
-      {
-        params: {
-          fields: JSON.stringify(['name', 'room_name', 'room_number', 'building', 'floor', 'block', 'capacity', 'room_type', 'status', 'disabled']),
-          limit_start: 0,
-          limit_page_length: 10,
-          order_by: 'name asc'
-        },
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'X-Frappe-CSRF-Token': token
+    let listResponse;
+    try {
+      listResponse = await axios.get(
+        `${FRAPPE_API_URL}/api/resource/ERP%20Administrative%20Room`,
+        {
+          params: {
+            fields: JSON.stringify(['name', 'room_name', 'room_number', 'building', 'floor', 'block', 'capacity', 'room_type', 'status', 'disabled']),
+            limit_start: 0,
+            limit_page_length: 10,
+            order_by: 'name asc'
+          },
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'X-Frappe-CSRF-Token': token
+          }
         }
+      );
+    } catch (e) {
+      if (e.response?.status === 404) {
+        listResponse = await axios.get(
+          `${FRAPPE_API_URL}/api/resource/Room`,
+          {
+            params: {
+              fields: JSON.stringify(['name', 'room_name', 'room_number', 'building', 'floor', 'block', 'capacity', 'room_type', 'status', 'disabled']),
+              limit_start: 0,
+              limit_page_length: 10,
+              order_by: 'name asc'
+            },
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'X-Frappe-CSRF-Token': token
+            }
+          }
+        );
+      } else {
+        throw e;
       }
-    );
+    }
 
     const roomList = listResponse.data.data || [];
     const totalCount = listResponse.data.total_count || listResponse.data.total;
