@@ -307,44 +307,14 @@ exports.searchLaptops = async (req, res) => {
   }
 };
 
-const sanitizeFileName = (originalName) => {
-  let temp = originalName.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  temp = temp.replace(/\s+/g, '_');
-  return temp;
-};
+const { uploadHandoverReport: uploadHelper, getHandoverReport: getHandoverHelper } = require('../../utils/uploadHelper');
 
 exports.uploadHandoverReport = async (req, res) => {
-  try {
-    const { laptopId, userId, username } = req.body;
-    if (!req.file) return res.status(400).json({ message: 'File không được tải lên.' });
-    const originalFileName = path.basename(req.file.path);
-    const sanitizedName = sanitizeFileName(originalFileName);
-    const oldPath = path.join(__dirname, '../../uploads/Handovers', originalFileName);
-    const newPath = path.join(__dirname, '../../uploads/Handovers', sanitizedName);
-    fs.renameSync(oldPath, newPath);
-    const laptop = await Laptop.findById(laptopId);
-    if (!laptop) return res.status(404).json({ message: 'Không tìm thấy thiết bị.' });
-    let currentAssignment = laptop.assignmentHistory.find((h) => h.user && h.user.toString() === userId && !h.endDate);
-    if (!currentAssignment) {
-      laptop.assignmentHistory.push({ user: new mongoose.Types.ObjectId(userId), startDate: new Date(), document: originalFileName });
-      currentAssignment = laptop.assignmentHistory[laptop.assignmentHistory.length - 1];
-    } else {
-      currentAssignment.document = sanitizedName;
-    }
-    laptop.status = 'Active';
-    await laptop.save();
-    return res.status(200).json({ message: 'Tải lên biên bản thành công!', laptop });
-  } catch (error) {
-    console.error('❌ Lỗi khi tải lên biên bản:', error);
-    res.status(500).json({ message: 'Đã xảy ra lỗi server.' });
-  }
+  return uploadHelper(req, res, Laptop, 'laptopId');
 };
 
 exports.getHandoverReport = async (req, res) => {
-  const { filename } = req.params;
-  const filePath = path.join(__dirname, '../../uploads/Handovers', filename);
-  if (!fs.existsSync(filePath)) return res.status(404).json({ message: 'Không tìm thấy file.' });
-  res.sendFile(filePath);
+  return getHandoverHelper(req, res);
 };
 
 exports.getLaptopById = async (req, res) => {

@@ -289,34 +289,14 @@ exports.updateMonitorStatus = async (req, res) => {
   }
 };
 
+const { uploadHandoverReport: uploadHelper, getHandoverReport: getHandoverHelper } = require('../../utils/uploadHelper');
+
 exports.uploadHandoverReport = async (req, res) => {
-  try {
-    const { monitorId, userId, username } = req.body;
-    if (!req.file) return res.status(400).json({ message: 'File không được tải lên.' });
-    const filePath = req.file.path;
-    const monitor = await Monitor.findById(monitorId);
-    if (!monitor) return res.status(404).json({ message: 'Không tìm thấy thiết bị.' });
-    let currentAssignment = monitor.assignmentHistory.find((h) => h.user && h.user.toString() === userId && !h.endDate);
-    if (!currentAssignment) {
-      monitor.assignmentHistory.push({ user: new mongoose.Types.ObjectId(userId), startDate: new Date(), document: filePath });
-      currentAssignment = monitor.assignmentHistory[monitor.assignmentHistory.length - 1];
-    } else {
-      currentAssignment.document = filePath;
-    }
-    monitor.status = 'Active';
-    await monitor.save();
-    return res.status(200).json({ message: 'Tải lên biên bản thành công!', monitor });
-  } catch (error) {
-    console.error('❌ Lỗi khi tải lên biên bản:', error);
-    res.status(500).json({ message: 'Đã xảy ra lỗi server.' });
-  }
+  return uploadHelper(req, res, Monitor, 'monitorId');
 };
 
 exports.getHandoverReport = async (req, res) => {
-  const { filename } = req.params;
-  const filePath = path.join(__dirname, '../../uploads/Handovers', filename);
-  if (!fs.existsSync(filePath)) return res.status(404).json({ message: 'Không tìm thấy file.' });
-  res.sendFile(filePath);
+  return getHandoverHelper(req, res);
 };
 
 // Get monitor statistics

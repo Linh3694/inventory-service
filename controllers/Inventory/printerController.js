@@ -271,35 +271,14 @@ exports.updatePrinterStatus = async (req, res) => {
   }
 };
 
+const { uploadHandoverReport: uploadHelper, getHandoverReport: getHandoverHelper } = require('../../utils/uploadHelper');
+
 exports.uploadHandoverReport = async (req, res) => {
-  try {
-    const { printerId, userId, username } = req.body;
-    if (!req.file) return res.status(400).json({ message: 'File không được tải lên.' });
-    const filePath = req.file.path;
-    const printer = await Printer.findById(printerId);
-    if (!printer) return res.status(404).json({ message: 'Không tìm thấy thiết bị.' });
-    if (!mongoose.Types.ObjectId.isValid(userId)) return res.status(400).json({ message: 'userId không hợp lệ.' });
-    let currentAssignment = printer.assignmentHistory.find((h) => h.user && h.user.toString() === userId && !h.endDate);
-    if (!currentAssignment) {
-      printer.assignmentHistory.push({ user: mongoose.Types.ObjectId(userId), startDate: new Date(), document: filePath });
-      currentAssignment = printer.assignmentHistory[printer.assignmentHistory.length - 1];
-    } else {
-      currentAssignment.document = filePath;
-    }
-    printer.status = 'Active';
-    await printer.save();
-    return res.status(200).json({ message: 'Tải lên biên bản thành công!', printer });
-  } catch (error) {
-    console.error('❌ Lỗi khi tải lên biên bản:', error);
-    res.status(500).json({ message: 'Đã xảy ra lỗi server.' });
-  }
+  return uploadHelper(req, res, Printer, 'printerId');
 };
 
 exports.getHandoverReport = async (req, res) => {
-  const { filename } = req.params;
-  const filePath = path.join(__dirname, '../../uploads/Handovers', filename);
-  if (!fs.existsSync(filePath)) return res.status(404).json({ message: 'Không tìm thấy file.' });
-  res.sendFile(filePath);
+  return getHandoverHelper(req, res);
 };
 
 // Get printer statistics

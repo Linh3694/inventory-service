@@ -263,6 +263,16 @@ exports.updatePhoneStatus = async (req, res) => {
   }
 };
 
+const { uploadHandoverReport: uploadHelper, getHandoverReport: getHandoverHelper } = require('../../utils/uploadHelper');
+
+exports.uploadHandoverReport = async (req, res) => {
+  return uploadHelper(req, res, Phone, 'phoneId');
+};
+
+exports.getHandoverReport = async (req, res) => {
+  return getHandoverHelper(req, res);
+};
+
 // Get phone statistics
 exports.getPhoneStatistics = async (req, res) => {
   try {
