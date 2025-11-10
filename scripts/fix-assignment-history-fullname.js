@@ -11,15 +11,25 @@
  */
 
 const mongoose = require('mongoose');
-const Database = require('../config/database');
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../config.env') });
+
+// Import models
+const User = require('../models/User');
+const Laptop = require('../models/Laptop');
+const Monitor = require('../models/Monitor');
+const Printer = require('../models/Printer');
+const Projector = require('../models/Projector');
+const Phone = require('../models/Phone');
+const Tool = require('../models/Tool');
 
 const deviceModels = [
-  'Laptop',
-  'Monitor',
-  'Printer',
-  'Projector',
-  'Phone',
-  'Tool'
+  { name: 'Laptop', model: Laptop },
+  { name: 'Monitor', model: Monitor },
+  { name: 'Printer', model: Printer },
+  { name: 'Projector', model: Projector },
+  { name: 'Phone', model: Phone },
+  { name: 'Tool', model: Tool }
 ];
 
 const fixAssignmentHistoryFullname = async () => {
@@ -28,17 +38,17 @@ const fixAssignmentHistoryFullname = async () => {
     console.log('');
 
     // Connect to database
-    await Database.connect();
+    console.log('🔄 Connecting to MongoDB...');
+    await mongoose.connect(process.env.MONGODB_URI);
+    console.log('✅ Connected to MongoDB\n');
 
-    const User = mongoose.model('User');
     let totalFixed = 0;
     let totalProcessed = 0;
 
     // Process each device type
-    for (const modelName of deviceModels) {
+    for (const { name: modelName, model: Model } of deviceModels) {
       console.log(`📱 Processing ${modelName}...`);
 
-      const Model = mongoose.model(modelName);
       const devices = await Model.find({
         'assignmentHistory.user': { $exists: true }
       }).populate('assignmentHistory.user');
@@ -93,6 +103,7 @@ const fixAssignmentHistoryFullname = async () => {
               device.assignmentHistory[i].user.fullname = fixedFullname;
               deviceUpdated = true;
               modelFixed++;
+              totalFixed++;
               console.log(`   ✅ Fixed: ${history.user.email} -> "${fixedFullname}"`);
             } else {
               console.log(`   ❌ Could not fix: ${history.user.email} (no fullname found)`);
@@ -114,25 +125,25 @@ const fixAssignmentHistoryFullname = async () => {
       console.log('');
     }
 
-    console.log('🎉 Fix completed!');
+    console.log('\n🎉 Fix completed!');
     console.log('');
     console.log('📊 Summary:');
     console.log(`   🔍 Processed: ${totalProcessed} assignment history entries`);
     console.log(`   ✅ Fixed: ${totalFixed} null fullnames`);
     console.log(`   📈 Success rate: ${totalProcessed > 0 ? ((totalFixed / totalProcessed) * 100).toFixed(1) : 0}%`);
 
+    await mongoose.connection.close();
+    console.log('\n🔌 Database disconnected');
+    process.exit(0);
+
   } catch (error) {
-    console.error('❌ Fix failed!');
+    console.error('\n❌ Fix failed!');
     console.error('Error:', error.message);
     if (error.stack) {
       console.error(error.stack);
     }
+    await mongoose.connection.close();
     process.exit(1);
-  } finally {
-    // Disconnect from database
-    await Database.disconnect();
-    console.log('');
-    console.log('🔌 Database disconnected');
   }
 };
 
