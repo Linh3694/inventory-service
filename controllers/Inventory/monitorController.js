@@ -60,6 +60,16 @@ exports.getMonitors = async (req, res) => {
         .populate('assignmentHistory.assignedBy', 'fullname email title')
         .populate('assignmentHistory.revokedBy', 'fullname email')
         .lean();
+      // Ensure fullname is always available - use userName if User.fullname is null
+      populated.forEach(monitor => {
+        if (monitor.assignmentHistory) {
+          monitor.assignmentHistory.forEach(history => {
+            if (!history.fullname && history.userName) {
+              history.fullname = history.userName;
+            }
+          });
+        }
+      });
       monitors = populated;
     } else {
       totalItems = await Monitor.countDocuments(query);
@@ -73,6 +83,16 @@ exports.getMonitors = async (req, res) => {
         .populate('assignmentHistory.assignedBy', 'fullname email title')
         .populate('assignmentHistory.revokedBy', 'fullname email')
         .lean();
+      // Ensure fullname is always available - use userName if User.fullname is null
+      monitors.forEach(monitor => {
+        if (monitor.assignmentHistory) {
+          monitor.assignmentHistory.forEach(history => {
+            if (!history.fullname && history.userName) {
+              history.fullname = history.userName;
+            }
+          });
+        }
+      });
     }
     const populatedMonitors = monitors.map((m) => ({
       ...m,
@@ -97,6 +117,16 @@ exports.getMonitorById = async (req, res) => {
       .populate('assignmentHistory.assignedBy', 'fullname email jobTitle avatarUrl')
       .populate('assignmentHistory.revokedBy', 'fullname email jobTitle avatarUrl');
     if (!monitor) return res.status(404).send({ message: 'Không tìm thấy monitor' });
+    
+    // Ensure fullname is always available - use userName if User.fullname is null
+    if (monitor.assignmentHistory) {
+      monitor.assignmentHistory.forEach(history => {
+        if (!history.fullname && history.userName) {
+          history.fullname = history.userName;
+        }
+      });
+    }
+    
     res.status(200).json(monitor);
   } catch (error) {
     res.status(500).send({ message: 'Lỗi máy chủ', error });
