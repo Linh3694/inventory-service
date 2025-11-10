@@ -8,21 +8,67 @@ exports.getAllInspections = async (req, res) => {
     if (deviceId) filter.deviceId = deviceId;
     if (inspectorId) filter.inspectorId = inspectorId;
     if (startDate && endDate) filter.inspectionDate = { $gte: new Date(startDate), $lte: new Date(endDate) };
-    const inspections = await Inspect.find(filter).populate('deviceId inspectorId');
+
+    const inspections = await Inspect.find(filter).populate('inspectorId');
+
+    // Custom populate for deviceId based on deviceType
+    const deviceModels = {
+      'Laptop': require('../models/Laptop'),
+      'Monitor': require('../models/Monitor'),
+      'Printer': require('../models/Printer'),
+      'Projector': require('../models/Projector'),
+      'Tool': require('../models/Tool'),
+      'Phone': require('../models/Phone')
+    };
+
+    for (const inspection of inspections) {
+      if (inspection.deviceId && inspection.deviceType && deviceModels[inspection.deviceType]) {
+        try {
+          const device = await deviceModels[inspection.deviceType].findById(inspection.deviceId);
+          inspection._doc.deviceId = device;
+        } catch (populateError) {
+          console.warn(`Failed to populate device for inspection ${inspection._id}:`, populateError.message);
+          // Keep original deviceId if populate fails
+        }
+      }
+    }
+
     res.status(200).json({ data: inspections });
   } catch (error) {
-    res.status(500).json({ message: 'Error fetching inspections', error });
+    console.error('Error fetching inspections:', error);
+    res.status(500).json({ message: 'Error fetching inspections', error: error.message });
   }
 };
 
 exports.getInspectionById = async (req, res) => {
   try {
     const { id } = req.params;
-    const inspection = await Inspect.findById(id).populate('deviceId inspectorId');
+    let inspection = await Inspect.findById(id).populate('inspectorId');
     if (!inspection) return res.status(404).json({ message: 'Inspection not found' });
+
+    // Custom populate for deviceId based on deviceType
+    const deviceModels = {
+      'Laptop': require('../models/Laptop'),
+      'Monitor': require('../models/Monitor'),
+      'Printer': require('../models/Printer'),
+      'Projector': require('../models/Projector'),
+      'Tool': require('../models/Tool'),
+      'Phone': require('../models/Phone')
+    };
+
+    if (inspection.deviceId && inspection.deviceType && deviceModels[inspection.deviceType]) {
+      try {
+        const device = await deviceModels[inspection.deviceType].findById(inspection.deviceId);
+        inspection._doc.deviceId = device;
+      } catch (populateError) {
+        console.warn(`Failed to populate device for inspection ${inspection._id}:`, populateError.message);
+      }
+    }
+
     res.status(200).json({ data: inspection });
   } catch (error) {
-    res.status(500).json({ message: 'Error fetching inspection', error });
+    console.error('Error fetching inspection:', error);
+    res.status(500).json({ message: 'Error fetching inspection', error: error.message });
   }
 };
 

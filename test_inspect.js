@@ -18,13 +18,42 @@ async function testInspectQuery() {
 
     console.log('Filter:', filter);
 
-    const inspections = await Inspect.find(filter).populate('deviceId inspectorId');
+    // Test new logic: populate inspectorId first
+    const inspections = await Inspect.find(filter).populate('inspectorId');
     console.log('Inspections found:', inspections.length);
-    console.log('First inspection:', inspections[0] || 'None');
 
-    // Test without populate
-    const inspectionsNoPopulate = await Inspect.find(filter);
-    console.log('Inspections without populate:', inspectionsNoPopulate.length);
+    if (inspections.length > 0) {
+      const inspection = inspections[0];
+      console.log('First inspection deviceType:', inspection.deviceType);
+      console.log('First inspection deviceId:', inspection.deviceId);
+
+      // Custom populate for deviceId based on deviceType
+      const deviceModels = {
+        'Laptop': require('./models/Laptop'),
+        'Monitor': require('./models/Monitor'),
+        'Printer': require('./models/Printer'),
+        'Projector': require('./models/Projector'),
+        'Tool': require('./models/Tool'),
+        'Phone': require('./models/Phone')
+      };
+
+      if (inspection.deviceId && inspection.deviceType && deviceModels[inspection.deviceType]) {
+        try {
+          const device = await deviceModels[inspection.deviceType].findById(inspection.deviceId);
+          console.log('Device found:', device ? device.name : 'null');
+          inspection._doc.deviceId = device;
+        } catch (populateError) {
+          console.warn('Failed to populate device:', populateError.message);
+        }
+      }
+
+      console.log('Final inspection:', {
+        id: inspection._id,
+        deviceType: inspection.deviceType,
+        deviceName: inspection.deviceId?.name || 'Not populated',
+        inspectorName: inspection.inspectorId?.fullname || 'Not populated'
+      });
+    }
 
   } catch (error) {
     console.error('Error:', error);
