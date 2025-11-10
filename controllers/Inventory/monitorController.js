@@ -249,7 +249,7 @@ exports.assignMonitor = async (req, res) => {
 exports.revokeMonitor = async (req, res) => {
   try {
     const { id } = req.params;
-    const { revokedBy, reasons, status } = req.body;
+    const { reasons, status } = req.body;
     const monitor = await Monitor.findById(id).populate('assigned');
     if (!monitor) return res.status(404).json({ message: 'Monitor không tồn tại' });
     const currentUser = req.user;

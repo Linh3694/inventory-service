@@ -232,7 +232,7 @@ exports.assignLaptop = async (req, res) => {
 exports.revokeLaptop = async (req, res) => {
   try {
     const { id } = req.params;
-    const { revokedBy, reasons, status } = req.body;
+    const { reasons, status } = req.body;
     const laptop = await Laptop.findById(id).populate('assigned');
     if (!laptop) return res.status(404).json({ message: 'Laptop không tồn tại' });
     const currentUser = req.user;

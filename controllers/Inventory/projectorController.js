@@ -199,7 +199,7 @@ exports.assignProjector = async (req, res) => {
 exports.revokeProjector = async (req, res) => {
   try {
     const { id } = req.params;
-    const { revokedBy, reasons, status } = req.body;
+    const { reasons, status } = req.body;
     const projector = await Projector.findById(id).populate('assigned');
     if (!projector) return res.status(404).json({ message: 'Projector không tồn tại' });
     const currentUser = req.user;

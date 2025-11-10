@@ -179,7 +179,7 @@ exports.assignTool = async (req, res) => {
 exports.revokeTool = async (req, res) => {
   try {
     const { id } = req.params;
-    const { revokedBy, reasons, status } = req.body;
+    const { reasons, status } = req.body;
     const tool = await Tool.findById(id).populate('assigned');
     if (!tool) return res.status(404).json({ message: 'Tool không tồn tại' });
     const currentUser = req.user;

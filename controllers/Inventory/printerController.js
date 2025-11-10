@@ -231,7 +231,7 @@ exports.assignPrinter = async (req, res) => {
 exports.revokePrinter = async (req, res) => {
   try {
     const { id } = req.params;
-    const { revokedBy, reasons, status } = req.body;
+    const { reasons, status } = req.body;
     const printer = await Printer.findById(id).populate('assigned');
     if (!printer) return res.status(404).json({ message: 'Printer không tồn tại' });
     const currentUser = req.user;

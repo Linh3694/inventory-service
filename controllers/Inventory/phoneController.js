@@ -223,7 +223,7 @@ exports.assignPhone = async (req, res) => {
 exports.revokePhone = async (req, res) => {
   try {
     const { id } = req.params;
-    const { revokedBy, reasons, status } = req.body;
+    const { reasons, status } = req.body;
     const phone = await Phone.findById(id).populate('assigned');
     if (!phone) return res.status(404).json({ message: 'Phone không tồn tại' });
     const currentUser = req.user;
