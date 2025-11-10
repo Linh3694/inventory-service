@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const path = require('path');
 const fs = require('fs');
 const redisService = require('../../services/redisService');
+const { ensureFullnameInHistory } = require('../../utils/assignmentHelper');
 
 exports.getPhones = async (req, res) => {
   try {
@@ -73,7 +74,7 @@ exports.getPhones = async (req, res) => {
         .populate('assignmentHistory.assignedBy', 'fullname email title')
         .populate('assignmentHistory.revokedBy', 'fullname email')
         .lean();
-      phones = populated;
+      phones = ensureFullnameInHistory(populated);
     } else {
       totalItems = await Phone.countDocuments(query);
       phones = await Phone.find(query)
@@ -86,6 +87,7 @@ exports.getPhones = async (req, res) => {
         .populate('assignmentHistory.assignedBy', 'fullname email title')
         .populate('assignmentHistory.revokedBy', 'fullname email')
         .lean();
+      phones = ensureFullnameInHistory(phones);
     }
 
     const populatedPhones = phones.map((p) => ({
@@ -113,6 +115,9 @@ exports.getPhoneById = async (req, res) => {
       .populate('assignmentHistory.assignedBy', 'fullname email jobTitle avatarUrl')
       .populate('assignmentHistory.revokedBy', 'fullname email jobTitle avatarUrl');
     if (!phone) return res.status(404).json({ message: 'Không tìm thấy phone' });
+    
+    ensureFullnameInHistory(phone);
+    
     res.status(200).json(phone);
   } catch (error) {
     res.status(500).json({ message: 'Lỗi máy chủ', error });

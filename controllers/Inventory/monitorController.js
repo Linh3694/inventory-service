@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const path = require('path');
 const fs = require('fs');
 const redisService = require('../../services/redisService');
+const { ensureFullnameInHistory } = require('../../utils/assignmentHelper');
 
 // Rút gọn: copy hành vi từ backend
 exports.getMonitors = async (req, res) => {
@@ -60,17 +61,7 @@ exports.getMonitors = async (req, res) => {
         .populate('assignmentHistory.assignedBy', 'fullname email title')
         .populate('assignmentHistory.revokedBy', 'fullname email')
         .lean();
-      // Ensure fullname is always available - use userName if User.fullname is null
-      populated.forEach(monitor => {
-        if (monitor.assignmentHistory) {
-          monitor.assignmentHistory.forEach(history => {
-            if (!history.fullname && history.userName) {
-              history.fullname = history.userName;
-            }
-          });
-        }
-      });
-      monitors = populated;
+      monitors = ensureFullnameInHistory(populated);
     } else {
       totalItems = await Monitor.countDocuments(query);
       monitors = await Monitor.find(query)
@@ -83,16 +74,7 @@ exports.getMonitors = async (req, res) => {
         .populate('assignmentHistory.assignedBy', 'fullname email title')
         .populate('assignmentHistory.revokedBy', 'fullname email')
         .lean();
-      // Ensure fullname is always available - use userName if User.fullname is null
-      monitors.forEach(monitor => {
-        if (monitor.assignmentHistory) {
-          monitor.assignmentHistory.forEach(history => {
-            if (!history.fullname && history.userName) {
-              history.fullname = history.userName;
-            }
-          });
-        }
-      });
+      monitors = ensureFullnameInHistory(monitors);
     }
     const populatedMonitors = monitors.map((m) => ({
       ...m,
@@ -118,14 +100,7 @@ exports.getMonitorById = async (req, res) => {
       .populate('assignmentHistory.revokedBy', 'fullname email jobTitle avatarUrl');
     if (!monitor) return res.status(404).send({ message: 'Không tìm thấy monitor' });
     
-    // Ensure fullname is always available - use userName if User.fullname is null
-    if (monitor.assignmentHistory) {
-      monitor.assignmentHistory.forEach(history => {
-        if (!history.fullname && history.userName) {
-          history.fullname = history.userName;
-        }
-      });
-    }
+    ensureFullnameInHistory(monitor);
     
     res.status(200).json(monitor);
   } catch (error) {

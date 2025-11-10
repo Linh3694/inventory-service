@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const path = require('path');
 const fs = require('fs');
 const redisService = require('../../services/redisService');
+const { ensureFullnameInHistory } = require('../../utils/assignmentHelper');
 
 exports.getPrinters = async (req, res) => {
   try {
@@ -46,7 +47,7 @@ exports.getPrinters = async (req, res) => {
         .populate('assignmentHistory.assignedBy', 'fullname email title')
         .populate('assignmentHistory.revokedBy', 'fullname email')
         .lean();
-      printers = populated;
+      printers = ensureFullnameInHistory(populated);
     } else {
       totalItems = await Printer.countDocuments(query);
       printers = await Printer.find(query)
@@ -59,6 +60,7 @@ exports.getPrinters = async (req, res) => {
         .populate('assignmentHistory.assignedBy', 'fullname email title')
         .populate('assignmentHistory.revokedBy', 'fullname email')
         .lean();
+      printers = ensureFullnameInHistory(printers);
     }
     const populatedPrinters = printers.map((p) => ({ ...p, room: p.room ? { ...p.room, location: p.room.location?.map((loc) => `${loc.building}, tầng ${loc.floor}`) || ['Không xác định'] } : { name: 'Không xác định', location: ['Không xác định'] } }));
     if (!hasFilters) await redisService.setDevicePage('printer', page, limit, populatedPrinters, totalItems, 300);
@@ -80,6 +82,9 @@ exports.getPrinterById = async (req, res) => {
       .populate('assignmentHistory.assignedBy', 'fullname email jobTitle avatarUrl')
       .populate('assignmentHistory.revokedBy', 'fullname email jobTitle avatarUrl');
     if (!printer) return res.status(404).json({ message: 'Không tìm thấy printer' });
+    
+    ensureFullnameInHistory(printer);
+    
     res.status(200).json(printer);
   } catch (error) {
     res.status(500).json({ message: 'Lỗi máy chủ', error });

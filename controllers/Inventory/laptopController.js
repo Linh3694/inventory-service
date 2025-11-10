@@ -65,7 +65,7 @@ exports.getLaptops = async (req, res) => {
         .populate('assignmentHistory.assignedBy', 'fullname email title')
         .populate('assignmentHistory.revokedBy', 'fullname email')
         .lean();
-      laptops = populated;
+      laptops = ensureFullnameInHistory(populated);
     } else {
       totalItems = await Laptop.countDocuments(query);
       laptops = await Laptop.find(query)
@@ -78,6 +78,7 @@ exports.getLaptops = async (req, res) => {
         .populate('assignmentHistory.assignedBy', 'fullname email title')
         .populate('assignmentHistory.revokedBy', 'fullname email')
         .lean();
+      laptops = ensureFullnameInHistory(laptops);
     }
     const populatedLaptops = laptops.map((l) => ({
       ...l,
