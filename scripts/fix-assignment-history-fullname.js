@@ -49,9 +49,10 @@ const fixAssignmentHistoryFullname = async () => {
     for (const { name: modelName, model: Model } of deviceModels) {
       console.log(`📱 Processing ${modelName}...`);
 
+      // Get all assignment history entries that reference users
       const devices = await Model.find({
         'assignmentHistory.user': { $exists: true }
-      }).populate('assignmentHistory.user');
+      });
 
       let modelFixed = 0;
 
@@ -62,55 +63,33 @@ const fixAssignmentHistoryFullname = async () => {
           const history = device.assignmentHistory[i];
           totalProcessed++;
 
-          // Check if user exists and has null fullname in populated data
-          if (history.user && typeof history.user === 'object') {
-            // If populated user has null fullname, or if we need to check the actual user document
-            let needsFixing = history.user.fullname === null;
+          // Check if this history entry has a user reference
+          if (history.user) {
+            // Query the actual user document to check if fullname is null
+            try {
+              const userDoc = await User.findById(history.user);
+              if (userDoc && userDoc.fullname === null) {
+                let fixedFullname = null;
 
-            if (!needsFixing && history.user._id) {
-              // Double-check by querying the actual user document
-              try {
-                const userDoc = await User.findById(history.user._id);
-                if (userDoc && userDoc.fullname === null) {
-                  needsFixing = true;
+                // Method 1: Try to get fullname from userName field
+                if (history.userName && history.userName.trim()) {
+                  fixedFullname = history.userName.trim();
+                  console.log(`   🔄 Using userName: "${fixedFullname}"`);
                 }
-              } catch (err) {
-                console.warn(`   ⚠️  Failed to lookup user for verification: ${err.message}`);
-              }
-            }
 
-            if (needsFixing) {
-              let fixedFullname = null;
-
-              // Method 1: Try to get fullname from userName field
-              if (history.userName && history.userName.trim()) {
-                fixedFullname = history.userName.trim();
-                console.log(`   🔄 Using userName: "${fixedFullname}"`);
-              }
-
-              // Method 2: Try to get from User collection directly (if it has fullname)
-              if (!fixedFullname && history.user._id) {
-                try {
-                  const userDoc = await User.findById(history.user._id);
-                  if (userDoc && userDoc.fullname) {
-                    fixedFullname = userDoc.fullname;
-                    console.log(`   🔄 Using User collection: "${fixedFullname}"`);
-                  }
-                } catch (err) {
-                  console.warn(`   ⚠️  Failed to lookup user: ${err.message}`);
+                // If we found a fullname, update the User document
+                if (fixedFullname) {
+                  await User.findByIdAndUpdate(history.user, { fullname: fixedFullname });
+                  deviceUpdated = true;
+                  modelFixed++;
+                  totalFixed++;
+                  console.log(`   ✅ Fixed: ${userDoc.email} -> "${fixedFullname}"`);
+                } else {
+                  console.log(`   ❌ Could not fix: ${userDoc.email} (no fullname source found)`);
                 }
               }
-
-              // If we found a fullname, update the User document
-              if (fixedFullname) {
-                await User.findByIdAndUpdate(history.user._id, { fullname: fixedFullname });
-                deviceUpdated = true;
-                modelFixed++;
-                totalFixed++;
-                console.log(`   ✅ Fixed: ${history.user.email} -> "${fixedFullname}"`);
-              } else {
-                console.log(`   ❌ Could not fix: ${history.user.email} (no fullname source found)`);
-              }
+            } catch (err) {
+              console.warn(`   ⚠️  Failed to lookup user: ${err.message}`);
             }
           }
         }
