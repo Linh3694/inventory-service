@@ -14,6 +14,7 @@ const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../config.env') });
 
 // Import models
+const User = require('../models/User');
 const Laptop = require('../models/Laptop');
 const Monitor = require('../models/Monitor');
 const Printer = require('../models/Printer');
