@@ -3,8 +3,7 @@ const mongoose = require('mongoose');
 const userSchema = new mongoose.Schema(
   {
     frappeUserId: { type: String, index: true },
-    fullname: { type: String, trim: true },
-    fullName: { type: String, trim: true },
+    fullname: { type: String, trim: true }, // Standard field for user's full name
     email: { type: String, trim: true, lowercase: true, index: true },
     avatarUrl: { type: String, trim: true },
     role: { type: String, trim: true },
@@ -14,6 +13,7 @@ const userSchema = new mongoose.Schema(
     designation: { type: String, trim: true },
     mobileNo: { type: String, trim: true },
     phone: { type: String, trim: true },
+    jobTitle: { type: String, trim: true }, // Added for consistency
   },
   { timestamps: true }
 );
@@ -45,8 +45,7 @@ userSchema.statics.updateFromFrappe = async function updateFromFrappe(frappeUser
 
   const update = {
     frappeUserId,
-    fullname: fullName,
-    fullName: fullName,
+    fullname: fullName, // Only use lowercase 'fullname'
     email,
     avatarUrl,
     role: frappeUser.role || undefined,
@@ -56,6 +55,7 @@ userSchema.statics.updateFromFrappe = async function updateFromFrappe(frappeUser
     designation: frappeUser.designation || undefined,
     mobileNo: frappeUser.mobile_no || undefined,
     phone: frappeUser.phone || undefined,
+    jobTitle: frappeUser.job_title || frappeUser.jobTitle || frappeUser.designation || undefined,
     updatedAt: new Date(),
   };
 

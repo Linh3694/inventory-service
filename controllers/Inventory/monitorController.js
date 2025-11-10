@@ -55,10 +55,10 @@ exports.getMonitors = async (req, res) => {
       totalItems = result[0]?.total[0]?.count || 0;
       const monitorIds = monitors.map((m) => m._id);
       const populated = await Monitor.find({ _id: { $in: monitorIds } })
-        .populate('assigned', 'fullname userName jobTitle department avatarUrl')
+        .populate('assigned', 'fullname jobTitle department avatarUrl email')
         .populate('room', 'name location status')
-        .populate('assignmentHistory.user', 'fullname userName email jobTitle avatarUrl')
-        .populate('assignmentHistory.assignedBy', 'fullname email title')
+        .populate('assignmentHistory.user', 'fullname email jobTitle avatarUrl')
+        .populate('assignmentHistory.assignedBy', 'fullname email jobTitle')
         .populate('assignmentHistory.revokedBy', 'fullname email')
         .lean();
       monitors = ensureFullnameInHistory(populated);
@@ -70,10 +70,10 @@ exports.getMonitors = async (req, res) => {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate('assigned', 'fullname userName jobTitle department avatarUrl')
+        .populate('assigned', 'fullname jobTitle department avatarUrl email')
         .populate('room', 'name location status')
-        .populate('assignmentHistory.user', 'fullname userName email jobTitle avatarUrl')
-        .populate('assignmentHistory.assignedBy', 'fullname email title')
+        .populate('assignmentHistory.user', 'fullname email jobTitle avatarUrl')
+        .populate('assignmentHistory.assignedBy', 'fullname email jobTitle')
         .populate('assignmentHistory.revokedBy', 'fullname email')
         .lean();
       monitors = ensureFullnameInHistory(monitors);
@@ -97,9 +97,9 @@ exports.getMonitorById = async (req, res) => {
   try {
     const { id } = req.params;
     const monitor = await Monitor.findById(id)
-      .populate('assigned', 'fullname userName email jobTitle avatarUrl')
+      .populate('assigned', 'fullname email jobTitle avatarUrl department')
       .populate('room', 'name location status')
-      .populate('assignmentHistory.user', 'fullname userName email jobTitle avatarUrl')
+      .populate('assignmentHistory.user', 'fullname email jobTitle avatarUrl')
       .populate('assignmentHistory.assignedBy', 'fullname email jobTitle avatarUrl')
       .populate('assignmentHistory.revokedBy', 'fullname email jobTitle avatarUrl');
     if (!monitor) return res.status(404).send({ message: 'Không tìm thấy monitor' });
@@ -254,7 +254,15 @@ exports.assignMonitor = async (req, res) => {
       ]
     });
     if (!newUser) return res.status(404).json({ message: 'Không tìm thấy user mới' });
-    monitor.assignmentHistory.push({ user: newUser._id, userName: newUser.fullname, startDate: new Date(), notes: reason || '', assignedBy: currentUser.id, jobTitle: newUser.jobTitle || 'Không xác định' });
+    monitor.assignmentHistory.push({ 
+      user: newUser._id, 
+      fullnameSnapshot: newUser.fullname, // New field: snapshot of fullname
+      userName: newUser.fullname, // Keep for backward compatibility
+      startDate: new Date(), 
+      notes: reason || '', 
+      assignedBy: currentUser.id, 
+      jobTitle: newUser.jobTitle || 'Không xác định' 
+    });
     monitor.currentHolder = { id: newUser._id, fullname: newUser.fullname, jobTitle: newUser.jobTitle, department: newUser.department, avatarUrl: newUser.avatarUrl };
     monitor.assigned = [newUser._id];
     monitor.status = 'PendingDocumentation';

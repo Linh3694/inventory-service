@@ -189,7 +189,15 @@ exports.assignProjector = async (req, res) => {
       ]
     });
     if (!newUser) return res.status(404).json({ message: 'Không tìm thấy user mới' });
-    projector.assignmentHistory.push({ user: newUser._id, userName: newUser.fullname, startDate: new Date(), notes: reason || '', assignedBy: currentUser?.id || null, jobTitle: newUser.jobTitle || 'Không xác định' });
+    projector.assignmentHistory.push({ 
+      user: newUser._id, 
+      fullnameSnapshot: newUser.fullname, // New field: snapshot of fullname
+      userName: newUser.fullname, // Keep for backward compatibility
+      startDate: new Date(), 
+      notes: reason || '', 
+      assignedBy: currentUser?.id || null, 
+      jobTitle: newUser.jobTitle || 'Không xác định' 
+    });
     projector.currentHolder = { id: newUser._id, fullname: newUser.fullname, jobTitle: newUser.jobTitle, department: newUser.department, avatarUrl: newUser.avatarUrl };
     projector.assigned = [newUser._id];
     projector.status = 'PendingDocumentation';

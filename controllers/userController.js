@@ -11,8 +11,7 @@ function formatFrappeUser(frappeUser) {
 
   return {
     frappeUserId: frappeUser.name,
-    fullname: fullName,
-    fullName: fullName,
+    fullname: fullName, // Only use lowercase 'fullname'
     email: frappeUser.email,
     avatarUrl: frappeUser.user_image,
     roles: Array.isArray(frappeUser.roles) 
@@ -21,6 +20,7 @@ function formatFrappeUser(frappeUser) {
     name: frappeUser.name,
     department: frappeUser.department,
     designation: frappeUser.designation,
+    jobTitle: frappeUser.job_title || frappeUser.designation,
   };
 }
 

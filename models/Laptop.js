@@ -2,7 +2,8 @@ const mongoose = require('mongoose');
 
 const assignmentHistorySchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  userName: { type: String },
+  fullnameSnapshot: { type: String }, // Snapshot of user's fullname at assignment time
+  userName: { type: String }, // DEPRECATED: keeping for backward compatibility, use fullnameSnapshot
   jobTitle: { type: String },
   startDate: { type: Date, default: Date.now },
   endDate: { type: Date },

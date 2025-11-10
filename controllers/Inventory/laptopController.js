@@ -223,7 +223,15 @@ exports.assignLaptop = async (req, res) => {
       ]
     });
     if (!newUser) return res.status(404).json({ message: 'Không tìm thấy user mới' });
-    laptop.assignmentHistory.push({ user: newUser._id, userName: newUser.fullname, startDate: new Date(), notes: reason || '', assignedBy: currentUser?.id || null, jobTitle: newUser.jobTitle || 'Không xác định' });
+    laptop.assignmentHistory.push({ 
+      user: newUser._id, 
+      fullnameSnapshot: newUser.fullname, // New field: snapshot of fullname
+      userName: newUser.fullname, // Keep for backward compatibility
+      startDate: new Date(), 
+      notes: reason || '', 
+      assignedBy: currentUser?.id || null, 
+      jobTitle: newUser.jobTitle || 'Không xác định' 
+    });
     laptop.currentHolder = { id: newUser._id, fullname: newUser.fullname, jobTitle: newUser.jobTitle, department: newUser.department, avatarUrl: newUser.avatarUrl };
     laptop.assigned = [newUser._id];
     laptop.status = 'PendingDocumentation';
