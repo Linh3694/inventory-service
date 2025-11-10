@@ -140,16 +140,27 @@ const authenticate = async (req, res, next) => {
       // Map JWT decoded to req.user format and get/create MongoDB ObjectId
       try {
         const email = decoded.email || decoded.user || userId;
+        
+        // Extract fullname from JWT (if available)
+        const jwtFullname = decoded.fullname || decoded.fullName || decoded.full_name || decoded.name || null;
+        
+        // Build update object - only update fullname if it has a value
+        const updateFields = {
+          email,
+          name: decoded.name || userId,
+          role: decoded.role || null,
+          roles: decoded.roles || [],
+          frappeUserId: userId
+        };
+        
+        // Only update fullname if JWT provides a valid value (don't overwrite with null)
+        if (jwtFullname) {
+          updateFields.fullname = jwtFullname;
+        }
+        
         const mongoUser = await User.findOneAndUpdate(
           { email },
-          {
-            email,
-            fullname: decoded.fullname || decoded.fullName || decoded.full_name || decoded.name || null,
-            name: decoded.name || userId,
-            role: decoded.role || null,
-            roles: decoded.roles || [],
-            frappeUserId: userId
-          },
+          updateFields,
           { upsert: true, new: true, setDefaultsOnInsert: true }
         );
 

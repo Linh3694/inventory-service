@@ -9,9 +9,8 @@ function formatFrappeUser(frappeUser) {
     [frappeUser.first_name, frappeUser.middle_name, frappeUser.last_name].filter(Boolean).join(' ') ||
     frappeUser.name;
 
-  return {
+  const userData = {
     frappeUserId: frappeUser.name,
-    fullname: fullName, // Only use lowercase 'fullname'
     email: frappeUser.email,
     avatarUrl: frappeUser.user_image,
     roles: Array.isArray(frappeUser.roles) 
@@ -22,6 +21,13 @@ function formatFrappeUser(frappeUser) {
     designation: frappeUser.designation,
     jobTitle: frappeUser.job_title || frappeUser.designation,
   };
+  
+  // Only include fullname if it has a valid value (don't overwrite with null/undefined)
+  if (fullName && fullName.trim()) {
+    userData.fullname = fullName;
+  }
+  
+  return userData;
 }
 
 // Fetch user details từ Frappe

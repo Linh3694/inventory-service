@@ -43,9 +43,9 @@ userSchema.statics.updateFromFrappe = async function updateFromFrappe(frappeUser
     ? frappeUser.roles_list
     : undefined;
 
+  // Build update object - only update fullname if it has a value
   const update = {
     frappeUserId,
-    fullname: fullName, // Only use lowercase 'fullname'
     email,
     avatarUrl,
     role: frappeUser.role || undefined,
@@ -58,6 +58,11 @@ userSchema.statics.updateFromFrappe = async function updateFromFrappe(frappeUser
     jobTitle: frappeUser.job_title || frappeUser.jobTitle || frappeUser.designation || undefined,
     updatedAt: new Date(),
   };
+  
+  // Only update fullname if Frappe provides a valid value (don't overwrite with null/undefined)
+  if (fullName && fullName.trim()) {
+    update.fullname = fullName;
+  }
 
   const query = email ? { email } : { frappeUserId };
   const options = { upsert: true, new: true, setDefaultsOnInsert: true };
