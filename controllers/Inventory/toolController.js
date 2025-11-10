@@ -151,7 +151,7 @@ exports.bulkUploadTools = async (req, res) => {
 exports.assignTool = async (req, res) => {
   try {
     const { id } = req.params;
-    const { newUserId, notes } = req.body;
+    const { assignedTo, reason } = req.body;
     const tool = await Tool.findById(id).populate('assigned');
     if (!tool) return res.status(404).json({ message: 'Không tìm thấy tool' });
     tool.assignmentHistory.forEach((e) => { if (!e.endDate) e.endDate = new Date(); });
@@ -161,9 +161,9 @@ exports.assignTool = async (req, res) => {
       const lastHistory = tool.assignmentHistory.find((h) => h.user.toString() === oldUserId.toString() && !h.endDate);
       if (lastHistory) { lastHistory.endDate = new Date(); lastHistory.revokedBy = currentUser?._id || null; }
     }
-    const newUser = await User.findById(newUserId);
+    const newUser = await User.findOne({ email: assignedTo });
     if (!newUser) return res.status(404).json({ message: 'Không tìm thấy user mới' });
-    tool.assignmentHistory.push({ user: newUser._id, userName: newUser.fullname, startDate: new Date(), notes: notes || '', assignedBy: currentUser?.id || null, jobTitle: newUser.jobTitle || 'Không xác định' });
+    tool.assignmentHistory.push({ user: newUser._id, userName: newUser.fullname, startDate: new Date(), notes: reason || '', assignedBy: currentUser?.id || null, jobTitle: newUser.jobTitle || 'Không xác định' });
     tool.currentHolder = { id: newUser._id, fullname: newUser.fullname, jobTitle: newUser.jobTitle, department: newUser.department, avatarUrl: newUser.avatarUrl };
     tool.assigned = [newUser._id];
     tool.status = 'PendingDocumentation';
