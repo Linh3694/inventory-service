@@ -51,7 +51,7 @@ const fixAssignmentHistoryFullname = async () => {
 
       const devices = await Model.find({
         'assignmentHistory.user': { $exists: true }
-      }).populate('assignmentHistory.user');
+      });
 
       let modelFixed = 0;
 
@@ -62,59 +62,45 @@ const fixAssignmentHistoryFullname = async () => {
           const history = device.assignmentHistory[i];
           totalProcessed++;
 
-          // Check if user.fullname is null
-          if (history.user && history.user.fullname === null) {
-            let fixedFullname = null;
+          // Check if user exists and has null fullname
+          if (history.user) {
+            try {
+              const userDoc = await User.findById(history.user);
 
-            // Method 1: Try to get fullname from userName field
-            if (history.userName && history.userName.trim()) {
-              fixedFullname = history.userName.trim();
-              console.log(`   🔄 Using userName: "${fixedFullname}"`);
-            }
+              if (userDoc && userDoc.fullname === null) {
+                let fixedFullname = null;
 
-            // Method 2: Try to get from User collection by email
-            if (!fixedFullname && history.user.email) {
-              try {
-                const userDoc = await User.findOne({ email: history.user.email });
-                if (userDoc && userDoc.fullname) {
+                // Method 1: Try to get fullname from userName field
+                if (history.userName && history.userName.trim()) {
+                  fixedFullname = history.userName.trim();
+                  console.log(`   🔄 Using userName: "${fixedFullname}"`);
+                }
+
+                // Method 2: Try to get from User collection (if it has fullname)
+                if (!fixedFullname && userDoc.fullname) {
                   fixedFullname = userDoc.fullname;
                   console.log(`   🔄 Using User collection: "${fixedFullname}"`);
                 }
-              } catch (err) {
-                console.warn(`   ⚠️  Failed to lookup user by email: ${history.user.email}`);
-              }
-            }
 
-            // Method 3: Try to get from User collection by _id
-            if (!fixedFullname && history.user._id) {
-              try {
-                const userDoc = await User.findById(history.user._id);
-                if (userDoc && userDoc.fullname) {
-                  fixedFullname = userDoc.fullname;
-                  console.log(`   🔄 Using User collection by ID: "${fixedFullname}"`);
+                // If we found a fullname, update the User document
+                if (fixedFullname) {
+                  await User.findByIdAndUpdate(history.user, { fullname: fixedFullname });
+                  deviceUpdated = true;
+                  modelFixed++;
+                  totalFixed++;
+                  console.log(`   ✅ Fixed: ${userDoc.email} -> "${fixedFullname}"`);
+                } else {
+                  console.log(`   ❌ Could not fix: ${userDoc.email} (no fullname source found)`);
                 }
-              } catch (err) {
-                console.warn(`   ⚠️  Failed to lookup user by ID: ${history.user._id}`);
               }
-            }
-
-            // If we found a fullname, update it
-            if (fixedFullname) {
-              device.assignmentHistory[i].user.fullname = fixedFullname;
-              deviceUpdated = true;
-              modelFixed++;
-              totalFixed++;
-              console.log(`   ✅ Fixed: ${history.user.email} -> "${fixedFullname}"`);
-            } else {
-              console.log(`   ❌ Could not fix: ${history.user.email} (no fullname found)`);
+            } catch (err) {
+              console.warn(`   ⚠️  Failed to lookup user: ${err.message}`);
+              continue;
             }
           }
         }
 
-        // Save device if any history was updated
-        if (deviceUpdated) {
-          await device.save();
-        }
+        // Note: We're updating User documents directly, no need to save device
       }
 
       if (modelFixed > 0) {

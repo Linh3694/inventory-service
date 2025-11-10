@@ -50,7 +50,7 @@ const checkAssignmentHistoryFullname = async () => {
 
       const devices = await Model.find({
         'assignmentHistory.user': { $exists: true }
-      }).populate('assignmentHistory.user');
+      });
 
       let modelEntries = 0;
       let modelNullFullname = 0;
@@ -61,11 +61,18 @@ const checkAssignmentHistoryFullname = async () => {
           modelEntries++;
 
           if (history.user) {
-            if (history.user.fullname === null) {
-              modelNullFullname++;
-              if (history.userName) {
-                modelWithUserName++;
+            // Check if user exists and has null fullname
+            try {
+              const userDoc = await User.findById(history.user);
+              if (userDoc && userDoc.fullname === null) {
+                modelNullFullname++;
+                if (history.userName) {
+                  modelWithUserName++;
+                }
               }
+            } catch (err) {
+              // Skip if user lookup fails
+              continue;
             }
           }
         }
