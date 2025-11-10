@@ -5,6 +5,7 @@ const fs = require('fs');
 const User = require('../../models/User');
 const Room = require('../../models/Room');
 const redisService = require('../../services/redisService');
+const { resolveRoomId } = require('../../utils/roomResolver');
 
 // Copy logic từ backend, giữ nguyên hành vi
 // Lấy danh sách laptop với pagination và cache
@@ -122,23 +123,69 @@ exports.updateLaptop = async (req, res) => {
   try {
     const { id } = req.params;
     const { name, manufacturer, serial, assigned, status, releaseYear, specs, type, room, reason } = req.body;
-    if (assigned && !Array.isArray(assigned)) return res.status(400).json({ message: 'Assigned phải là mảng ID người sử dụng hợp lệ.' });
-    if (room && !mongoose.Types.ObjectId.isValid(room)) return res.status(400).json({ message: 'Room ID không hợp lệ!' });
+    
+    if (assigned && !Array.isArray(assigned)) {
+      return res.status(400).json({ message: 'Assigned phải là mảng ID người sử dụng hợp lệ.' });
+    }
+    
+    // Handle room: can be MongoDB ObjectId or Frappe room ID (string)
+    let resolvedRoomId = room;
+    if (room) {
+      try {
+        resolvedRoomId = await resolveRoomId(room);
+        if (!resolvedRoomId) {
+          return res.status(400).json({ 
+            message: 'Phòng không tồn tại',
+            details: `Cannot find room with ID: ${room}` 
+          });
+        }
+      } catch (error) {
+        return res.status(400).json({ 
+          message: 'Lỗi khi xử lý phòng',
+          details: error.message 
+        });
+      }
+    }
+    
     let validStatus = status;
-    if (!['Active', 'Standby', 'Broken', 'PendingDocumentation'].includes(status)) {
+    if (status && !['Active', 'Standby', 'Broken', 'PendingDocumentation'].includes(status)) {
       const oldLaptop = await Laptop.findById(id).lean();
       if (!oldLaptop) return res.status(404).json({ message: 'Không tìm thấy laptop.' });
       validStatus = oldLaptop.status;
     }
-    if (validStatus === 'Broken' && !reason) return res.status(400).json({ message: "Lý do báo hỏng là bắt buộc khi trạng thái là 'Broken'!" });
-    if (assigned && assigned.length > 0 && validStatus === 'Standby') validStatus = 'PendingDocumentation';
-    const updatedData = { name, manufacturer, serial, assigned, status: validStatus, releaseYear, specs, type, room, reason: validStatus === 'Broken' ? reason : undefined, assignmentHistory: req.body.assignmentHistory };
-    const laptop = await Laptop.findByIdAndUpdate(id, updatedData, { new: true });
+    
+    if (validStatus === 'Broken' && !reason) {
+      return res.status(400).json({ message: "Lý do báo hỏng là bắt buộc khi trạng thái là 'Broken'!" });
+    }
+    
+    if (assigned && assigned.length > 0 && validStatus === 'Standby') {
+      validStatus = 'PendingDocumentation';
+    }
+    
+    const updatedData = {
+      ...(name && { name }),
+      ...(manufacturer && { manufacturer }),
+      ...(serial && { serial }),
+      ...(assigned && { assigned }),
+      ...(validStatus && { status: validStatus }),
+      ...(releaseYear && { releaseYear }),
+      ...(specs && { specs }),
+      ...(type && { type }),
+      ...(resolvedRoomId && { room: resolvedRoomId }),
+      ...(validStatus === 'Broken' && reason && { reason }),
+      ...(req.body.assignmentHistory && { assignmentHistory: req.body.assignmentHistory })
+    };
+    
+    console.log('📝 Updating laptop with:', updatedData);
+    const laptop = await Laptop.findByIdAndUpdate(id, updatedData, { new: true })
+      .populate('room', 'frappeRoomId name room_name building capacity');
+    
     if (!laptop) return res.status(404).json({ message: 'Không tìm thấy laptop' });
+    
     await redisService.deleteDeviceCache('laptop');
     res.json(laptop);
   } catch (error) {
-    console.error('Error updating laptop:', error.message);
+    console.error('❌ Error updating laptop:', error.message);
     res.status(400).json({ message: 'Error updating laptop', error: error.message });
   }
 };
