@@ -55,9 +55,9 @@ exports.getMonitors = async (req, res) => {
       totalItems = result[0]?.total[0]?.count || 0;
       const monitorIds = monitors.map((m) => m._id);
       const populated = await Monitor.find({ _id: { $in: monitorIds } })
-        .populate('assigned', 'fullname jobTitle department avatarUrl')
+        .populate('assigned', 'fullname userName jobTitle department avatarUrl')
         .populate('room', 'name location status')
-        .populate('assignmentHistory.user', 'fullname email jobTitle avatarUrl')
+        .populate('assignmentHistory.user', 'fullname userName email jobTitle avatarUrl')
         .populate('assignmentHistory.assignedBy', 'fullname email title')
         .populate('assignmentHistory.revokedBy', 'fullname email')
         .lean();
@@ -70,9 +70,9 @@ exports.getMonitors = async (req, res) => {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate('assigned', 'fullname jobTitle department avatarUrl')
+        .populate('assigned', 'fullname userName jobTitle department avatarUrl')
         .populate('room', 'name location status')
-        .populate('assignmentHistory.user', 'fullname email jobTitle avatarUrl')
+        .populate('assignmentHistory.user', 'fullname userName email jobTitle avatarUrl')
         .populate('assignmentHistory.assignedBy', 'fullname email title')
         .populate('assignmentHistory.revokedBy', 'fullname email')
         .lean();
@@ -97,9 +97,9 @@ exports.getMonitorById = async (req, res) => {
   try {
     const { id } = req.params;
     const monitor = await Monitor.findById(id)
-      .populate('assigned', 'fullname email jobTitle avatarUrl')
+      .populate('assigned', 'fullname userName email jobTitle avatarUrl')
       .populate('room', 'name location status')
-      .populate('assignmentHistory.user', 'fullname email jobTitle avatarUrl')
+      .populate('assignmentHistory.user', 'fullname userName email jobTitle avatarUrl')
       .populate('assignmentHistory.assignedBy', 'fullname email jobTitle avatarUrl')
       .populate('assignmentHistory.revokedBy', 'fullname email jobTitle avatarUrl');
     if (!monitor) return res.status(404).send({ message: 'Không tìm thấy monitor' });
