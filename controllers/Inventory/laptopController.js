@@ -236,22 +236,18 @@ exports.revokeLaptop = async (req, res) => {
     const laptop = await Laptop.findById(id).populate('assigned');
     if (!laptop) return res.status(404).json({ message: 'Laptop không tồn tại' });
     const currentUser = req.user;
-    const revokedById = typeof currentUser._id === 'string' 
-      ? require('mongoose').Types.ObjectId(currentUser._id) 
-      : currentUser._id;
-    
     if (laptop.assigned.length > 0) {
       const oldUserId = laptop.assigned[0]._id;
       const lastHistory = laptop.assignmentHistory.find((h) => h.user?.toString() === oldUserId.toString() && !h.endDate);
       if (lastHistory) {
         lastHistory.endDate = new Date();
-        lastHistory.revokedBy = revokedById;
+        lastHistory.revokedBy = currentUser._id;
         // reasons là array of strings theo schema
         lastHistory.revokedReason = Array.isArray(reasons) ? reasons.filter(r => typeof r === 'string') : [];
       }
     } else {
       laptop.assignmentHistory.push({
-        revokedBy: revokedById,
+        revokedBy: currentUser._id,
         revokedReason: Array.isArray(reasons) ? reasons.filter(r => typeof r === 'string') : [],
         endDate: new Date()
       });

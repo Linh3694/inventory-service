@@ -227,21 +227,17 @@ exports.revokePhone = async (req, res) => {
     const phone = await Phone.findById(id).populate('assigned');
     if (!phone) return res.status(404).json({ message: 'Phone không tồn tại' });
     const currentUser = req.user;
-    const revokedById = typeof currentUser._id === 'string' 
-      ? require('mongoose').Types.ObjectId(currentUser._id) 
-      : currentUser._id;
-    
     if (phone.assigned.length > 0) {
       const oldUserId = phone.assigned[0]._id;
       const lastHistory = phone.assignmentHistory.find((hist) => hist.user?.toString() === oldUserId.toString() && !hist.endDate);
       if (lastHistory) {
         lastHistory.endDate = new Date();
-        lastHistory.revokedBy = revokedById;
+        lastHistory.revokedBy = currentUser._id;
         lastHistory.revokedReason = Array.isArray(reasons) ? reasons.filter(r => typeof r === 'string') : [];
       }
     } else {
       phone.assignmentHistory.push({
-        revokedBy: revokedById,
+        revokedBy: currentUser._id,
         revokedReason: Array.isArray(reasons) ? reasons.filter(r => typeof r === 'string') : [],
         endDate: new Date()
       });

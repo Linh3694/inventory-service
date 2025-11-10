@@ -93,7 +93,7 @@ const authenticate = async (req, res, next) => {
       try {
         const mongoUser = await User.updateFromFrappe(frappeUser);
         req.user = {
-          _id: mongoUser._id.toString(), // MongoDB ObjectId
+          _id: mongoUser._id, // MongoDB ObjectId object
           id: mongoUser._id.toString(),
           name: frappeUser.name || frappeUser.email,
           fullname: frappeUser.full_name || frappeUser.fullname || frappeUser.name,
@@ -154,7 +154,7 @@ const authenticate = async (req, res, next) => {
         );
 
         req.user = {
-          _id: mongoUser._id.toString(), // MongoDB ObjectId
+          _id: mongoUser._id, // MongoDB ObjectId object
           id: mongoUser._id.toString(),
           name: decoded.name || userId,
           fullname: decoded.fullname || decoded.fullName || decoded.full_name || decoded.name || null,

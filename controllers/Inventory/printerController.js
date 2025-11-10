@@ -211,10 +211,7 @@ exports.assignPrinter = async (req, res) => {
     if (printer.assigned?.length > 0) {
       const oldUserId = printer.assigned[0]._id;
       const lastHistory = printer.assignmentHistory.find((h) => h.user.toString() === oldUserId.toString() && !h.endDate);
-      const revokedById = typeof currentUser._id === 'string' 
-        ? require('mongoose').Types.ObjectId(currentUser._id) 
-        : currentUser._id;
-      if (lastHistory) { lastHistory.endDate = new Date(); lastHistory.revokedBy = revokedById; }
+      if (lastHistory) { lastHistory.endDate = new Date(); lastHistory.revokedBy = currentUser._id; }
     }
     const newUser = await User.findById(newUserId);
     if (!newUser) return res.status(404).json({ message: 'Không tìm thấy user mới' });
@@ -238,21 +235,17 @@ exports.revokePrinter = async (req, res) => {
     const printer = await Printer.findById(id).populate('assigned');
     if (!printer) return res.status(404).json({ message: 'Printer không tồn tại' });
     const currentUser = req.user;
-    const revokedById = typeof currentUser._id === 'string' 
-      ? require('mongoose').Types.ObjectId(currentUser._id) 
-      : currentUser._id;
-    
     if (printer.assigned.length > 0) {
       const oldUserId = printer.assigned[0]._id;
       const lastHistory = printer.assignmentHistory.find((hist) => hist.user?.toString() === oldUserId.toString() && !hist.endDate);
       if (lastHistory) {
         lastHistory.endDate = new Date();
-        lastHistory.revokedBy = revokedById;
+        lastHistory.revokedBy = currentUser._id;
         lastHistory.revokedReason = Array.isArray(reasons) ? reasons.filter(r => typeof r === 'string') : [];
       }
     } else {
       printer.assignmentHistory.push({
-        revokedBy: revokedById,
+        revokedBy: currentUser._id,
         revokedReason: Array.isArray(reasons) ? reasons.filter(r => typeof r === 'string') : [],
         endDate: new Date()
       });
