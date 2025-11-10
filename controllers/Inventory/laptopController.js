@@ -6,6 +6,7 @@ const User = require('../../models/User');
 const Room = require('../../models/Room');
 const redisService = require('../../services/redisService');
 const { resolveRoomId } = require('../../utils/roomResolver');
+const { ensureFullnameInHistory } = require('../../utils/assignmentHelper');
 
 // Copy logic từ backend, giữ nguyên hành vi
 // Lấy danh sách laptop với pagination và cache
