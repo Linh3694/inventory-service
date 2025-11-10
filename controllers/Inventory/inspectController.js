@@ -1,4 +1,5 @@
 const Inspect = require('../../models/Inspect');
+const User = require('../../models/User');
 const path = require('path');
 
 exports.getAllInspections = async (req, res) => {
@@ -75,9 +76,70 @@ exports.getInspectionById = async (req, res) => {
 exports.createInspection = async (req, res) => {
   try {
     const { deviceId, deviceType, results, passed, recommendations, technicalConclusion, followUpRecommendation, overallAssessment } = req.body;
-    const inspectorId = req.user?._id;
-    if (!deviceId || !deviceType || !inspectorId) return res.status(400).json({ message: 'Thiếu thông tin bắt buộc.' });
-    const newInspection = new Inspect({ deviceId, deviceType, inspectorId, inspectionDate: new Date(), results, overallAssessment: overallAssessment || '', passed: passed || false, recommendations: JSON.stringify(recommendations), technicalConclusion: technicalConclusion || '', followUpRecommendation: followUpRecommendation || '' });
+    
+    // Get user email from req.user (could be _id or email)
+    const userEmail = req.user?.email || req.user?._id || req.user?.id;
+    if (!userEmail) {
+      return res.status(400).json({ message: 'Không tìm thấy thông tin người dùng.' });
+    }
+    
+    // Find or create User in database by email
+    let inspector = await User.findOne({ email: userEmail });
+    if (!inspector) {
+      // If user doesn't exist, try to sync from Frappe using req.user data
+      if (req.user && req.user.provider === 'frappe') {
+        try {
+          inspector = await User.updateFromFrappe({
+            email: req.user.email,
+            name: req.user.name,
+            full_name: req.user.fullname,
+            fullname: req.user.fullname,
+            role: req.user.role,
+            roles: req.user.roles,
+            department: req.user.department,
+            designation: req.user.jobTitle,
+          });
+        } catch (syncError) {
+          console.warn('Failed to sync user from Frappe:', syncError.message);
+        }
+      }
+      
+      // If still no user, create a basic one
+      if (!inspector) {
+        inspector = await User.findOneAndUpdate(
+          { email: userEmail },
+          {
+            email: userEmail,
+            fullname: req.user?.fullname || req.user?.name || userEmail,
+            name: req.user?.name || userEmail,
+          },
+          { upsert: true, new: true }
+        );
+      }
+    }
+    
+    if (!inspector || !inspector._id) {
+      return res.status(400).json({ message: 'Không thể tạo hoặc tìm thấy người kiểm tra.' });
+    }
+    
+    const inspectorId = inspector._id;
+    
+    if (!deviceId || !deviceType) {
+      return res.status(400).json({ message: 'Thiếu thông tin bắt buộc.' });
+    }
+    
+    const newInspection = new Inspect({ 
+      deviceId, 
+      deviceType, 
+      inspectorId, 
+      inspectionDate: new Date(), 
+      results, 
+      overallAssessment: overallAssessment || '', 
+      passed: passed || false, 
+      recommendations: JSON.stringify(recommendations), 
+      technicalConclusion: technicalConclusion || '', 
+      followUpRecommendation: followUpRecommendation || '' 
+    });
     await newInspection.save();
     res.status(201).json({ message: 'Inspection created successfully', data: newInspection });
   } catch (error) {
