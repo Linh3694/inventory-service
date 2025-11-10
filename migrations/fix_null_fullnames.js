@@ -95,40 +95,42 @@ async function fixNullFullnames(frappeToken = null) {
         let newFullname = null;
         let source = '';
 
-        // PRIORITY 1: Check if old field 'fullName' (capital N) exists
-        if (user.fullName) {
-          newFullname = user.fullName;
-          source = 'from old fullName field';
-        }
-        
-        // PRIORITY 2: Try to get from Frappe (if token provided)
-        if (!newFullname && frappeToken && user.email) {
+        // PRIORITY 1: Try to get fresh data from Frappe (if token provided)
+        // Frappe is the source of truth - always prefer it when available
+        if (frappeToken && user.email) {
           newFullname = await fetchFromFrappe(user.email, frappeToken);
           if (newFullname) {
             fromFrappe++;
-            source = 'from Frappe API';
+            source = 'from Frappe API (source of truth)';
           }
         }
+        
+        // PRIORITY 2: Fallback to old field 'fullName' (capital N) if exists
+        // This is legacy data but better than nothing
+        if (!newFullname && user.fullName) {
+          newFullname = user.fullName;
+          source = 'from old fullName field (legacy)';
+        }
 
-        // PRIORITY 3: Extract from email
+        // PRIORITY 3: Extract from email as last resort
         if (!newFullname && user.email) {
           newFullname = extractNameFromEmail(user.email);
           fromEmail++;
-          source = 'from email extraction';
+          source = 'from email extraction (fallback)';
         }
 
         // PRIORITY 4: Use frappeUserId or "Unknown"
         if (!newFullname) {
           newFullname = user.frappeUserId || user.name || 'Unknown User';
-          source = 'fallback';
+          source = 'fallback (unknown)';
         }
 
-        // Update user
+        // Update user with new fullname
         user.fullname = newFullname;
         
-        // Also clean up old fullName field (optional)
+        // Clean up old fullName field to avoid confusion
         if (user.fullName) {
-          user.fullName = undefined; // Remove old field
+          user.fullName = undefined; // Remove deprecated field
         }
         
         await user.save();
@@ -186,4 +188,5 @@ if (require.main === module) {
 }
 
 module.exports = { fixNullFullnames, extractNameFromEmail };
+
 
