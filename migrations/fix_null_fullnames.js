@@ -15,7 +15,7 @@ require('dotenv').config();
 
 const User = require('../models/User');
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/inventory';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/inventory_service';
 const FRAPPE_API_URL = process.env.FRAPPE_API_URL || 'https://admin.sis.wellspring.edu.vn';
 
 /**
@@ -93,31 +93,47 @@ async function fixNullFullnames(frappeToken = null) {
     for (const user of usersWithNullFullname) {
       try {
         let newFullname = null;
+        let source = '';
 
-        // Try to get from Frappe first (if token provided)
-        if (frappeToken && user.email) {
+        // PRIORITY 1: Check if old field 'fullName' (capital N) exists
+        if (user.fullName) {
+          newFullname = user.fullName;
+          source = 'from old fullName field';
+        }
+        
+        // PRIORITY 2: Try to get from Frappe (if token provided)
+        if (!newFullname && frappeToken && user.email) {
           newFullname = await fetchFromFrappe(user.email, frappeToken);
           if (newFullname) {
             fromFrappe++;
+            source = 'from Frappe API';
           }
         }
 
-        // Fallback: Extract from email
+        // PRIORITY 3: Extract from email
         if (!newFullname && user.email) {
           newFullname = extractNameFromEmail(user.email);
           fromEmail++;
+          source = 'from email extraction';
         }
 
-        // Fallback: Use frappeUserId or "Unknown"
+        // PRIORITY 4: Use frappeUserId or "Unknown"
         if (!newFullname) {
           newFullname = user.frappeUserId || user.name || 'Unknown User';
+          source = 'fallback';
         }
 
         // Update user
         user.fullname = newFullname;
+        
+        // Also clean up old fullName field (optional)
+        if (user.fullName) {
+          user.fullName = undefined; // Remove old field
+        }
+        
         await user.save();
 
-        console.log(`   ✅ Fixed: ${user.email || user.frappeUserId} -> "${newFullname}"`);
+        console.log(`   ✅ Fixed: ${user.email || user.frappeUserId} -> "${newFullname}" (${source})`);
         fixed++;
       } catch (error) {
         console.error(`   ❌ Failed to fix ${user.email || user._id}: ${error.message}`);
