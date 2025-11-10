@@ -171,7 +171,7 @@ exports.bulkUploadProjectors = async (req, res) => {
 exports.assignProjector = async (req, res) => {
   try {
     const { id } = req.params;
-    const { newUserId, notes } = req.body;
+    const { assignedTo, reason } = req.body;
     const projector = await Projector.findById(id).populate('assigned');
     if (!projector) return res.status(404).json({ message: 'Không tìm thấy projector' });
     projector.assignmentHistory.forEach((e) => { if (!e.endDate) e.endDate = new Date(); });
@@ -181,9 +181,9 @@ exports.assignProjector = async (req, res) => {
       const lastHistory = projector.assignmentHistory.find((h) => h.user.toString() === oldUserId.toString() && !h.endDate);
       if (lastHistory) { lastHistory.endDate = new Date(); lastHistory.revokedBy = currentUser?._id || null; }
     }
-    const newUser = await User.findById(newUserId);
+    const newUser = await User.findOne({ email: assignedTo });
     if (!newUser) return res.status(404).json({ message: 'Không tìm thấy user mới' });
-    projector.assignmentHistory.push({ user: newUser._id, userName: newUser.fullname, startDate: new Date(), notes: notes || '', assignedBy: currentUser?.id || null, jobTitle: newUser.jobTitle || 'Không xác định' });
+    projector.assignmentHistory.push({ user: newUser._id, userName: newUser.fullname, startDate: new Date(), notes: reason || '', assignedBy: currentUser?.id || null, jobTitle: newUser.jobTitle || 'Không xác định' });
     projector.currentHolder = { id: newUser._id, fullname: newUser.fullname, jobTitle: newUser.jobTitle, department: newUser.department, avatarUrl: newUser.avatarUrl };
     projector.assigned = [newUser._id];
     projector.status = 'PendingDocumentation';

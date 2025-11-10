@@ -203,7 +203,7 @@ exports.deleteLaptop = async (req, res) => {
 exports.assignLaptop = async (req, res) => {
   try {
     const { id } = req.params;
-    const { newUserId, notes } = req.body;
+    const { assignedTo, reason } = req.body;
     const laptop = await Laptop.findById(id).populate('assigned');
     if (!laptop) return res.status(404).json({ message: 'Không tìm thấy laptop' });
     laptop.assignmentHistory.forEach((e) => { if (!e.endDate) e.endDate = new Date(); });
@@ -213,9 +213,9 @@ exports.assignLaptop = async (req, res) => {
       const lastHistory = laptop.assignmentHistory.find((h) => h.user.toString() === oldUserId.toString() && !h.endDate);
       if (lastHistory) { lastHistory.endDate = new Date(); lastHistory.revokedBy = currentUser?._id || null; }
     }
-    const newUser = await User.findById(newUserId);
+    const newUser = await User.findOne({ email: assignedTo });
     if (!newUser) return res.status(404).json({ message: 'Không tìm thấy user mới' });
-    laptop.assignmentHistory.push({ user: newUser._id, userName: newUser.fullname, startDate: new Date(), notes: notes || '', assignedBy: currentUser?.id || null, jobTitle: newUser.jobTitle || 'Không xác định' });
+    laptop.assignmentHistory.push({ user: newUser._id, userName: newUser.fullname, startDate: new Date(), notes: reason || '', assignedBy: currentUser?.id || null, jobTitle: newUser.jobTitle || 'Không xác định' });
     laptop.currentHolder = { id: newUser._id, fullname: newUser.fullname, jobTitle: newUser.jobTitle, department: newUser.department, avatarUrl: newUser.avatarUrl };
     laptop.assigned = [newUser._id];
     laptop.status = 'PendingDocumentation';

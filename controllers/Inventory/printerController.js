@@ -203,7 +203,7 @@ exports.bulkUploadPrinters = async (req, res) => {
 exports.assignPrinter = async (req, res) => {
   try {
     const { id } = req.params;
-    const { newUserId, notes } = req.body;
+    const { assignedTo, reason } = req.body;
     const printer = await Printer.findById(id).populate('assigned');
     if (!printer) return res.status(404).json({ message: 'Không tìm thấy printer' });
     printer.assignmentHistory.forEach((e) => { if (!e.endDate) e.endDate = new Date(); });
@@ -213,9 +213,9 @@ exports.assignPrinter = async (req, res) => {
       const lastHistory = printer.assignmentHistory.find((h) => h.user.toString() === oldUserId.toString() && !h.endDate);
       if (lastHistory) { lastHistory.endDate = new Date(); lastHistory.revokedBy = currentUser._id; }
     }
-    const newUser = await User.findById(newUserId);
+    const newUser = await User.findOne({ email: assignedTo });
     if (!newUser) return res.status(404).json({ message: 'Không tìm thấy user mới' });
-    printer.assignmentHistory.push({ user: newUser._id, userName: newUser.fullname, startDate: new Date(), notes: notes || '', assignedBy: currentUser.id, jobTitle: newUser.jobTitle || 'Không xác định' });
+    printer.assignmentHistory.push({ user: newUser._id, userName: newUser.fullname, startDate: new Date(), notes: reason || '', assignedBy: currentUser.id, jobTitle: newUser.jobTitle || 'Không xác định' });
     printer.currentHolder = { id: newUser._id, fullname: newUser.fullname, jobTitle: newUser.jobTitle, department: newUser.department, avatarUrl: newUser.avatarUrl };
     printer.assigned = [newUser._id];
     printer.status = 'PendingDocumentation';
