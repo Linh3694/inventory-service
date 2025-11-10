@@ -186,9 +186,17 @@ exports.revokeTool = async (req, res) => {
     if (tool.assigned.length > 0) {
       const oldUserId = tool.assigned[0]._id;
       const lastHistory = tool.assignmentHistory.find((hist) => hist.user?.toString() === oldUserId.toString() && !hist.endDate);
-      if (lastHistory) { lastHistory.endDate = new Date(); lastHistory.revokedBy = currentUser.id; lastHistory.revokedReason = reasons; }
+      if (lastHistory) {
+        lastHistory.endDate = new Date();
+        lastHistory.revokedBy = currentUser._id;
+        lastHistory.revokedReason = Array.isArray(reasons) ? reasons.filter(r => typeof r === 'string') : [];
+      }
     } else {
-      tool.assignmentHistory.push({ revokedBy, revokedReason: reasons, endDate: new Date() });
+      tool.assignmentHistory.push({
+        revokedBy: currentUser._id,
+        revokedReason: Array.isArray(reasons) ? reasons.filter(r => typeof r === 'string') : [],
+        endDate: new Date()
+      });
     }
     tool.status = status || 'Standby';
     tool.currentHolder = null;

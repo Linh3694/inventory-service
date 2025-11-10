@@ -206,9 +206,17 @@ exports.revokeProjector = async (req, res) => {
     if (projector.assigned.length > 0) {
       const oldUserId = projector.assigned[0]._id;
       const lastHistory = projector.assignmentHistory.find((hist) => hist.user?.toString() === oldUserId.toString() && !hist.endDate);
-      if (lastHistory) { lastHistory.endDate = new Date(); lastHistory.revokedBy = currentUser.id; lastHistory.revokedReason = reasons; }
+      if (lastHistory) {
+        lastHistory.endDate = new Date();
+        lastHistory.revokedBy = currentUser._id;
+        lastHistory.revokedReason = Array.isArray(reasons) ? reasons.filter(r => typeof r === 'string') : [];
+      }
     } else {
-      projector.assignmentHistory.push({ revokedBy, revokedReason: reasons, endDate: new Date() });
+      projector.assignmentHistory.push({
+        revokedBy: currentUser._id,
+        revokedReason: Array.isArray(reasons) ? reasons.filter(r => typeof r === 'string') : [],
+        endDate: new Date()
+      });
     }
     projector.status = status || 'Standby';
     projector.currentHolder = null;

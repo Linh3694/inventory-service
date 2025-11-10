@@ -256,9 +256,17 @@ exports.revokeMonitor = async (req, res) => {
     if (monitor.assigned.length > 0) {
       const oldUserId = monitor.assigned[0]._id;
       const lastHistory = monitor.assignmentHistory.find((hist) => hist.user?.toString() === oldUserId.toString() && !hist.endDate);
-      if (lastHistory) { lastHistory.endDate = new Date(); lastHistory.revokedBy = currentUser.id; lastHistory.revokedReason = reasons; }
+      if (lastHistory) {
+        lastHistory.endDate = new Date();
+        lastHistory.revokedBy = currentUser._id;
+        lastHistory.revokedReason = Array.isArray(reasons) ? reasons.filter(r => typeof r === 'string') : [];
+      }
     } else {
-      monitor.assignmentHistory.push({ revokedBy, revokedReason: reasons, endDate: new Date() });
+      monitor.assignmentHistory.push({
+        revokedBy: currentUser._id,
+        revokedReason: Array.isArray(reasons) ? reasons.filter(r => typeof r === 'string') : [],
+        endDate: new Date()
+      });
     }
     monitor.status = status || 'Standby';
     monitor.currentHolder = null;

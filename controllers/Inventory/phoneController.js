@@ -230,9 +230,17 @@ exports.revokePhone = async (req, res) => {
     if (phone.assigned.length > 0) {
       const oldUserId = phone.assigned[0]._id;
       const lastHistory = phone.assignmentHistory.find((hist) => hist.user?.toString() === oldUserId.toString() && !hist.endDate);
-      if (lastHistory) { lastHistory.endDate = new Date(); lastHistory.revokedBy = currentUser.id; lastHistory.revokedReason = reasons; }
+      if (lastHistory) {
+        lastHistory.endDate = new Date();
+        lastHistory.revokedBy = currentUser._id;
+        lastHistory.revokedReason = Array.isArray(reasons) ? reasons.filter(r => typeof r === 'string') : [];
+      }
     } else {
-      phone.assignmentHistory.push({ revokedBy, revokedReason: reasons, endDate: new Date() });
+      phone.assignmentHistory.push({
+        revokedBy: currentUser._id,
+        revokedReason: Array.isArray(reasons) ? reasons.filter(r => typeof r === 'string') : [],
+        endDate: new Date()
+      });
     }
     phone.status = status || 'Standby';
     phone.currentHolder = null;

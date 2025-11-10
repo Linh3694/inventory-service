@@ -239,9 +239,18 @@ exports.revokeLaptop = async (req, res) => {
     if (laptop.assigned.length > 0) {
       const oldUserId = laptop.assigned[0]._id;
       const lastHistory = laptop.assignmentHistory.find((h) => h.user?.toString() === oldUserId.toString() && !h.endDate);
-      if (lastHistory) { lastHistory.endDate = new Date(); lastHistory.revokedBy = currentUser.id; lastHistory.revokedReason = reasons; }
+      if (lastHistory) {
+        lastHistory.endDate = new Date();
+        lastHistory.revokedBy = currentUser._id;
+        // reasons là array of strings theo schema
+        lastHistory.revokedReason = Array.isArray(reasons) ? reasons.filter(r => typeof r === 'string') : [];
+      }
     } else {
-      laptop.assignmentHistory.push({ revokedBy, revokedReason: reasons, endDate: new Date() });
+      laptop.assignmentHistory.push({
+        revokedBy: currentUser._id,
+        revokedReason: Array.isArray(reasons) ? reasons.filter(r => typeof r === 'string') : [],
+        endDate: new Date()
+      });
     }
     laptop.status = status || 'Standby';
     laptop.currentHolder = null;

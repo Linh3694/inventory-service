@@ -238,9 +238,17 @@ exports.revokePrinter = async (req, res) => {
     if (printer.assigned.length > 0) {
       const oldUserId = printer.assigned[0]._id;
       const lastHistory = printer.assignmentHistory.find((hist) => hist.user?.toString() === oldUserId.toString() && !hist.endDate);
-      if (lastHistory) { lastHistory.endDate = new Date(); lastHistory.revokedBy = currentUser.id; lastHistory.revokedReason = reasons; }
+      if (lastHistory) {
+        lastHistory.endDate = new Date();
+        lastHistory.revokedBy = currentUser._id;
+        lastHistory.revokedReason = Array.isArray(reasons) ? reasons.filter(r => typeof r === 'string') : [];
+      }
     } else {
-      printer.assignmentHistory.push({ revokedBy, revokedReason: reasons, endDate: new Date() });
+      printer.assignmentHistory.push({
+        revokedBy: currentUser._id,
+        revokedReason: Array.isArray(reasons) ? reasons.filter(r => typeof r === 'string') : [],
+        endDate: new Date()
+      });
     }
     printer.status = status || 'Standby';
     printer.currentHolder = null;
