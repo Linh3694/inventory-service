@@ -4,11 +4,13 @@
  * Adds 'fullname' field to history for easy frontend consumption
  */
 const ensureFullnameInHistory = (documents) => {
-  if (!Array.isArray(documents)) {
-    documents = [documents];
-  }
+  // Handle null/undefined input
+  if (!documents) return documents;
+  
+  const isArray = Array.isArray(documents);
+  const docs = isArray ? documents : [documents];
 
-  documents.forEach(doc => {
+  docs.forEach(doc => {
     if (doc && doc.assignmentHistory && Array.isArray(doc.assignmentHistory)) {
       doc.assignmentHistory.forEach(history => {
         // Priority order for fullname:
@@ -22,7 +24,7 @@ const ensureFullnameInHistory = (documents) => {
     }
   });
 
-  return Array.isArray(arguments[0]) ? documents : documents[0];
+  return isArray ? docs : docs[0];
 };
 
 module.exports = {
