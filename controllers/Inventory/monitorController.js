@@ -62,6 +62,8 @@ exports.getMonitors = async (req, res) => {
         .populate('assignmentHistory.revokedBy', 'fullname email')
         .lean();
       monitors = ensureFullnameInHistory(populated);
+      console.log('🔍 [DEBUG] getMonitors - search path, after ensureFullnameInHistory:');
+      console.log('  First monitor:', JSON.stringify(monitors[0]?.assignmentHistory?.[0], null, 2));
     } else {
       totalItems = await Monitor.countDocuments(query);
       monitors = await Monitor.find(query)
@@ -75,6 +77,8 @@ exports.getMonitors = async (req, res) => {
         .populate('assignmentHistory.revokedBy', 'fullname email')
         .lean();
       monitors = ensureFullnameInHistory(monitors);
+      console.log('🔍 [DEBUG] getMonitors - non-search path, after ensureFullnameInHistory:');
+      console.log('  First monitor:', JSON.stringify(monitors[0]?.assignmentHistory?.[0], null, 2));
     }
     const populatedMonitors = monitors.map((m) => ({
       ...m,
@@ -100,7 +104,13 @@ exports.getMonitorById = async (req, res) => {
       .populate('assignmentHistory.revokedBy', 'fullname email jobTitle avatarUrl');
     if (!monitor) return res.status(404).send({ message: 'Không tìm thấy monitor' });
     
+    console.log('🔍 [DEBUG] getMonitorById - before ensureFullnameInHistory:');
+    console.log('  assignmentHistory[0]:', JSON.stringify(monitor.assignmentHistory?.[0], null, 2));
+    
     ensureFullnameInHistory(monitor);
+    
+    console.log('🔍 [DEBUG] getMonitorById - after ensureFullnameInHistory:');
+    console.log('  assignmentHistory[0]:', JSON.stringify(monitor.assignmentHistory?.[0], null, 2));
     
     res.status(200).json(monitor);
   } catch (error) {
