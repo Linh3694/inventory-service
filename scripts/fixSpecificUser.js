@@ -80,7 +80,7 @@ async function fixSpecificUser(userId = '6759d48300ed146910c108cd', targetFullna
   for (const Model of models) {
     try {
       const documents = await Model.find({
-        'assignmentHistory.user': mongoose.Types.ObjectId(userId),
+        'assignmentHistory.user': new mongoose.Types.ObjectId(userId),
       });
 
       for (const doc of documents) {
@@ -122,7 +122,7 @@ async function fixSpecificUser(userId = '6759d48300ed146910c108cd', targetFullna
   for (const Model of models) {
     try {
       const documents = await Model.find({
-        'assigned._id': mongoose.Types.ObjectId(userId),
+        'assigned._id': new mongoose.Types.ObjectId(userId),
       });
 
       for (const doc of documents) {
