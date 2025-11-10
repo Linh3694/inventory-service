@@ -51,7 +51,7 @@ const fixAssignmentHistoryFullname = async () => {
 
       const devices = await Model.find({
         'assignmentHistory.user': { $exists: true }
-      });
+      }).populate('assignmentHistory.user');
 
       let modelFixed = 0;
 
@@ -62,40 +62,38 @@ const fixAssignmentHistoryFullname = async () => {
           const history = device.assignmentHistory[i];
           totalProcessed++;
 
-          // Check if user exists and has null fullname
-          if (history.user) {
-            try {
-              const userDoc = await User.findById(history.user);
+          // Check if user exists and has null fullname in populated data
+          if (history.user && typeof history.user === 'object' && history.user.fullname === null) {
+            let fixedFullname = null;
 
-              if (userDoc && userDoc.fullname === null) {
-                let fixedFullname = null;
+            // Method 1: Try to get fullname from userName field
+            if (history.userName && history.userName.trim()) {
+              fixedFullname = history.userName.trim();
+              console.log(`   🔄 Using userName: "${fixedFullname}"`);
+            }
 
-                // Method 1: Try to get fullname from userName field
-                if (history.userName && history.userName.trim()) {
-                  fixedFullname = history.userName.trim();
-                  console.log(`   🔄 Using userName: "${fixedFullname}"`);
-                }
-
-                // Method 2: Try to get from User collection (if it has fullname)
-                if (!fixedFullname && userDoc.fullname) {
+            // Method 2: Try to get from User collection directly (if it has fullname)
+            if (!fixedFullname && history.user._id) {
+              try {
+                const userDoc = await User.findById(history.user._id);
+                if (userDoc && userDoc.fullname) {
                   fixedFullname = userDoc.fullname;
                   console.log(`   🔄 Using User collection: "${fixedFullname}"`);
                 }
-
-                // If we found a fullname, update the User document
-                if (fixedFullname) {
-                  await User.findByIdAndUpdate(history.user, { fullname: fixedFullname });
-                  deviceUpdated = true;
-                  modelFixed++;
-                  totalFixed++;
-                  console.log(`   ✅ Fixed: ${userDoc.email} -> "${fixedFullname}"`);
-                } else {
-                  console.log(`   ❌ Could not fix: ${userDoc.email} (no fullname source found)`);
-                }
+              } catch (err) {
+                console.warn(`   ⚠️  Failed to lookup user: ${err.message}`);
               }
-            } catch (err) {
-              console.warn(`   ⚠️  Failed to lookup user: ${err.message}`);
-              continue;
+            }
+
+            // If we found a fullname, update the User document
+            if (fixedFullname) {
+              await User.findByIdAndUpdate(history.user._id, { fullname: fixedFullname });
+              deviceUpdated = true;
+              modelFixed++;
+              totalFixed++;
+              console.log(`   ✅ Fixed: ${history.user.email} -> "${fixedFullname}"`);
+            } else {
+              console.log(`   ❌ Could not fix: ${history.user.email} (no fullname source found)`);
             }
           }
         }
