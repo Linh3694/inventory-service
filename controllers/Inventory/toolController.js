@@ -161,8 +161,13 @@ exports.assignTool = async (req, res) => {
       const lastHistory = tool.assignmentHistory.find((h) => h.user.toString() === oldUserId.toString() && !h.endDate);
       if (lastHistory) { lastHistory.endDate = new Date(); lastHistory.revokedBy = currentUser?._id || null; }
     }
-    // Lookup user by frappeUserId (assignedTo is the user.name from Frappe)
-    const newUser = await User.findOne({ frappeUserId: assignedTo });
+    // Lookup user by frappeUserId or email (assignedTo could be either from Frappe)
+    const newUser = await User.findOne({
+      $or: [
+        { frappeUserId: assignedTo },
+        { email: assignedTo }
+      ]
+    });
     if (!newUser) return res.status(404).json({ message: 'Không tìm thấy user mới' });
     tool.assignmentHistory.push({ user: newUser._id, userName: newUser.fullname, startDate: new Date(), notes: reason || '', assignedBy: currentUser?.id || null, jobTitle: newUser.jobTitle || 'Không xác định' });
     tool.currentHolder = { id: newUser._id, fullname: newUser.fullname, jobTitle: newUser.jobTitle, department: newUser.department, avatarUrl: newUser.avatarUrl };
