@@ -6,7 +6,7 @@ const FRAPPE_API_URL = process.env.FRAPPE_API_URL || 'https://admin.sis.wellspri
 
 // Helper: trích xuất userId linh hoạt từ token (tương thích đa nguồn)
 function getUserIdFromDecoded(decoded) {
-  return decoded?.id || decoded?.userId || decoded?.user || decoded?.name || null;
+  return decoded?.id || decoded?.userId || decoded?.user || decoded?.name || decoded?.email || decoded?.sub || null;
 }
 
 // Try validating token via Frappe first, then fallback to JWT
@@ -26,6 +26,7 @@ async function resolveFrappeUserByToken(token) {
       return erpResp.data.user;
     }
   } catch (e) {
+    console.warn('⚠️ [Auth] ERP endpoint failed:', e.message);
     // Fallback to Frappe default
     try {
       const loggedResp = await axios.get(
@@ -53,6 +54,7 @@ async function resolveFrappeUserByToken(token) {
         return userResp.data?.data || null;
       }
     } catch (fallbackErr) {
+      console.warn('⚠️ [Auth] Frappe default endpoint also failed:', fallbackErr.message);
       // Will continue to JWT validation
     }
   }
@@ -77,7 +79,11 @@ const authenticate = async (req, res, next) => {
     let frappeUser = null;
     try {
       frappeUser = await resolveFrappeUserByToken(token);
+      if (frappeUser) {
+        console.log('✅ [Auth] Frappe authentication successful for:', frappeUser.email || frappeUser.name);
+      }
     } catch (e) {
+      console.warn('⚠️ [Auth] Frappe authentication failed:', e.message);
       // Continue to JWT validation
     }
 
@@ -103,11 +109,25 @@ const authenticate = async (req, res, next) => {
     // 2. Fallback to JWT validation for backward compatibility
     const secret = process.env.JWT_SECRET || 'breakpoint';
     try {
+      // Check if token looks like a JWT (has 3 parts separated by dots)
+      const isJWTFormat = token.split('.').length === 3;
+      if (!isJWTFormat) {
+        console.warn('⚠️ [Auth] Token does not appear to be JWT format, skipping JWT validation');
+        return res.status(401).json({ 
+          success: false, 
+          message: 'Frappe authentication failed and token is not a valid JWT', 
+          code: 'AUTH_FAILED' 
+        });
+      }
+
       const decoded = jwt.verify(token, secret);
       const userId = getUserIdFromDecoded(decoded);
       if (!userId) {
+        console.warn('⚠️ [Auth] JWT decoded but no userId found. Decoded keys:', Object.keys(decoded));
         return res.status(401).json({ success: false, message: 'Invalid token structure', code: 'INVALID_TOKEN' });
       }
+
+      console.log('✅ [Auth] JWT authentication successful for:', userId);
 
       // Map JWT decoded to req.user format
       req.user = {
