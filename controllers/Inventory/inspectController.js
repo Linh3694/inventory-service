@@ -9,7 +9,7 @@ exports.getAllInspections = async (req, res) => {
     if (inspectorId) filter.inspectorId = inspectorId;
     if (startDate && endDate) filter.inspectionDate = { $gte: new Date(startDate), $lte: new Date(endDate) };
 
-    const inspections = await Inspect.find(filter).populate('inspectorId');
+    const inspections = await Inspect.find(filter);
 
     // Custom populate for deviceId based on deviceType
     const deviceModels = {
@@ -43,7 +43,7 @@ exports.getAllInspections = async (req, res) => {
 exports.getInspectionById = async (req, res) => {
   try {
     const { id } = req.params;
-    let inspection = await Inspect.findById(id).populate('inspectorId');
+    let inspection = await Inspect.findById(id);
     if (!inspection) return res.status(404).json({ message: 'Inspection not found' });
 
     // Custom populate for deviceId based on deviceType

@@ -18,8 +18,8 @@ async function testInspectQuery() {
 
     console.log('Filter:', filter);
 
-    // Test new logic: populate inspectorId first
-    const inspections = await Inspect.find(filter).populate('inspectorId');
+    // Test new logic: don't populate inspectorId first to avoid User model error
+    const inspections = await Inspect.find(filter);
     console.log('Inspections found:', inspections.length);
 
     if (inspections.length > 0) {
