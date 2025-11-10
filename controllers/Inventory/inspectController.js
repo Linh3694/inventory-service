@@ -13,12 +13,12 @@ exports.getAllInspections = async (req, res) => {
 
     // Custom populate for deviceId based on deviceType
     const deviceModels = {
-      'laptop': require('../models/Laptop'),
-      'monitor': require('../models/Monitor'),
-      'printer': require('../models/Printer'),
-      'projector': require('../models/Projector'),
-      'tool': require('../models/Tool'),
-      'phone': require('../models/Phone')
+      'laptop': require('../../models/Laptop'),
+      'monitor': require('../../models/Monitor'),
+      'printer': require('../../models/Printer'),
+      'projector': require('../../models/Projector'),
+      'tool': require('../../models/Tool'),
+      'phone': require('../../models/Phone')
     };
 
     for (const inspection of inspections) {
@@ -48,12 +48,12 @@ exports.getInspectionById = async (req, res) => {
 
     // Custom populate for deviceId based on deviceType
     const deviceModels = {
-      'laptop': require('../models/Laptop'),
-      'monitor': require('../models/Monitor'),
-      'printer': require('../models/Printer'),
-      'projector': require('../models/Projector'),
-      'tool': require('../models/Tool'),
-      'phone': require('../models/Phone')
+      'laptop': require('../../models/Laptop'),
+      'monitor': require('../../models/Monitor'),
+      'printer': require('../../models/Printer'),
+      'projector': require('../../models/Projector'),
+      'tool': require('../../models/Tool'),
+      'phone': require('../../models/Phone')
     };
 
     if (inspection.deviceId && inspection.deviceType && deviceModels[inspection.deviceType]) {
