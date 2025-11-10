@@ -183,17 +183,21 @@ exports.revokeTool = async (req, res) => {
     const tool = await Tool.findById(id).populate('assigned');
     if (!tool) return res.status(404).json({ message: 'Tool không tồn tại' });
     const currentUser = req.user;
+    const revokedById = typeof currentUser._id === 'string' 
+      ? require('mongoose').Types.ObjectId(currentUser._id) 
+      : currentUser._id;
+    
     if (tool.assigned.length > 0) {
       const oldUserId = tool.assigned[0]._id;
       const lastHistory = tool.assignmentHistory.find((hist) => hist.user?.toString() === oldUserId.toString() && !hist.endDate);
       if (lastHistory) {
         lastHistory.endDate = new Date();
-        lastHistory.revokedBy = currentUser._id;
+        lastHistory.revokedBy = revokedById;
         lastHistory.revokedReason = Array.isArray(reasons) ? reasons.filter(r => typeof r === 'string') : [];
       }
     } else {
       tool.assignmentHistory.push({
-        revokedBy: currentUser._id,
+        revokedBy: revokedById,
         revokedReason: Array.isArray(reasons) ? reasons.filter(r => typeof r === 'string') : [],
         endDate: new Date()
       });

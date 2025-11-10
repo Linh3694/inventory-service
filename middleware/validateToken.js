@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
+const User = require('../models/User');
 
 // Frappe API configuration
 const FRAPPE_API_URL = process.env.FRAPPE_API_URL || 'https://admin.sis.wellspring.edu.vn';
@@ -88,22 +89,29 @@ const authenticate = async (req, res, next) => {
     }
 
     if (frappeUser) {
-      // Map Frappe user to req.user format
-      req.user = {
-        _id: frappeUser.email || frappeUser.name,
-        id: frappeUser.email || frappeUser.name,
-        name: frappeUser.name || frappeUser.email,
-        fullname: frappeUser.full_name || frappeUser.fullname || frappeUser.name,
-        email: frappeUser.email,
-        role: frappeUser.role || frappeUser.user_role || 'user',
-        roles: frappeUser.frappe_roles || [frappeUser.role] || ['user'],
-        employeeCode: frappeUser.employee_code || null,
-        department: frappeUser.department || null,
-        jobTitle: frappeUser.job_title || null,
-        token,
-        provider: 'frappe'
-      };
-      return next();
+      // Map Frappe user to req.user format and get MongoDB ObjectId
+      try {
+        const mongoUser = await User.updateFromFrappe(frappeUser);
+        req.user = {
+          _id: mongoUser._id.toString(), // MongoDB ObjectId
+          id: mongoUser._id.toString(),
+          name: frappeUser.name || frappeUser.email,
+          fullname: frappeUser.full_name || frappeUser.fullname || frappeUser.name,
+          email: frappeUser.email,
+          role: frappeUser.role || frappeUser.user_role || 'user',
+          roles: frappeUser.frappe_roles || [frappeUser.role] || ['user'],
+          employeeCode: frappeUser.employee_code || null,
+          department: frappeUser.department || null,
+          jobTitle: frappeUser.job_title || null,
+          frappeUserId: frappeUser.name || frappeUser.email,
+          token,
+          provider: 'frappe'
+        };
+        return next();
+      } catch (mongoError) {
+        console.error('❌ [Auth] Failed to sync Frappe user to MongoDB:', mongoError.message);
+        return res.status(500).json({ success: false, message: 'Failed to process user', code: 'USER_SYNC_FAILED' });
+      }
     }
 
     // 2. Fallback to JWT validation for backward compatibility
@@ -129,23 +137,43 @@ const authenticate = async (req, res, next) => {
 
       console.log('✅ [Auth] JWT authentication successful for:', userId);
 
-      // Map JWT decoded to req.user format
-      req.user = {
-        _id: userId,
-        id: userId,
-        name: decoded.name || userId,
-        fullname: decoded.fullname || decoded.fullName || decoded.full_name || decoded.name || null,
-        email: decoded.email || decoded.user || null,
-        role: decoded.role || null,
-        roles: decoded.roles || [],
-        employeeCode: decoded.employeeCode || null,
-        department: decoded.department || null,
-        jobTitle: decoded.jobTitle || decoded.designation || null,
-        token,
-        provider: 'jwt'
-      };
+      // Map JWT decoded to req.user format and get/create MongoDB ObjectId
+      try {
+        const email = decoded.email || decoded.user || userId;
+        const mongoUser = await User.findOneAndUpdate(
+          { email },
+          {
+            email,
+            fullname: decoded.fullname || decoded.fullName || decoded.full_name || decoded.name || null,
+            name: decoded.name || userId,
+            role: decoded.role || null,
+            roles: decoded.roles || [],
+            frappeUserId: userId
+          },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
 
-      return next();
+        req.user = {
+          _id: mongoUser._id.toString(), // MongoDB ObjectId
+          id: mongoUser._id.toString(),
+          name: decoded.name || userId,
+          fullname: decoded.fullname || decoded.fullName || decoded.full_name || decoded.name || null,
+          email: decoded.email || decoded.user || null,
+          role: decoded.role || null,
+          roles: decoded.roles || [],
+          employeeCode: decoded.employeeCode || null,
+          department: decoded.department || null,
+          jobTitle: decoded.jobTitle || decoded.designation || null,
+          frappeUserId: userId,
+          token,
+          provider: 'jwt'
+        };
+
+        return next();
+      } catch (mongoError) {
+        console.error('❌ [Auth] Failed to sync JWT user to MongoDB:', mongoError.message);
+        return res.status(500).json({ success: false, message: 'Failed to process user', code: 'USER_SYNC_FAILED' });
+      }
     } catch (jwtError) {
       if (jwtError.name === 'JsonWebTokenError') {
         return res.status(401).json({ success: false, message: 'Invalid token', code: 'INVALID_TOKEN' });

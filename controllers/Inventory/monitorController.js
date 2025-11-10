@@ -229,7 +229,10 @@ exports.assignMonitor = async (req, res) => {
     if (monitor.assigned?.length > 0) {
       const oldUserId = monitor.assigned[0]._id;
       const lastHistory = monitor.assignmentHistory.find((h) => h.user.toString() === oldUserId.toString() && !h.endDate);
-      if (lastHistory) { lastHistory.endDate = new Date(); lastHistory.revokedBy = currentUser._id; }
+      const revokedById = typeof currentUser._id === 'string' 
+        ? require('mongoose').Types.ObjectId(currentUser._id) 
+        : currentUser._id;
+      if (lastHistory) { lastHistory.endDate = new Date(); lastHistory.revokedBy = revokedById; }
     }
     const newUser = await User.findById(newUserId);
     if (!newUser) return res.status(404).json({ message: 'Không tìm thấy user mới' });
@@ -253,17 +256,21 @@ exports.revokeMonitor = async (req, res) => {
     const monitor = await Monitor.findById(id).populate('assigned');
     if (!monitor) return res.status(404).json({ message: 'Monitor không tồn tại' });
     const currentUser = req.user;
+    const revokedById = typeof currentUser._id === 'string' 
+      ? require('mongoose').Types.ObjectId(currentUser._id) 
+      : currentUser._id;
+    
     if (monitor.assigned.length > 0) {
       const oldUserId = monitor.assigned[0]._id;
       const lastHistory = monitor.assignmentHistory.find((hist) => hist.user?.toString() === oldUserId.toString() && !hist.endDate);
       if (lastHistory) {
         lastHistory.endDate = new Date();
-        lastHistory.revokedBy = currentUser._id;
+        lastHistory.revokedBy = revokedById;
         lastHistory.revokedReason = Array.isArray(reasons) ? reasons.filter(r => typeof r === 'string') : [];
       }
     } else {
       monitor.assignmentHistory.push({
-        revokedBy: currentUser._id,
+        revokedBy: revokedById,
         revokedReason: Array.isArray(reasons) ? reasons.filter(r => typeof r === 'string') : [],
         endDate: new Date()
       });
