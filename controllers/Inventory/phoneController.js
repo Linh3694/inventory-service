@@ -205,7 +205,8 @@ exports.assignPhone = async (req, res) => {
       const lastHistory = phone.assignmentHistory.find((h) => h.user.toString() === oldUserId.toString() && !h.endDate);
       if (lastHistory) { lastHistory.endDate = new Date(); lastHistory.revokedBy = currentUser?._id || null; }
     }
-    const newUser = await User.findOne({ email: assignedTo });
+    // Lookup user by frappeUserId (assignedTo is the user.name from Frappe)
+    const newUser = await User.findOne({ frappeUserId: assignedTo });
     if (!newUser) return res.status(404).json({ message: 'Không tìm thấy user mới' });
     phone.assignmentHistory.push({ user: newUser._id, userName: newUser.fullname, startDate: new Date(), notes: reason || '', assignedBy: currentUser?.id || null, jobTitle: newUser.jobTitle || 'Không xác định' });
     phone.currentHolder = { id: newUser._id, fullname: newUser.fullname, jobTitle: newUser.jobTitle, department: newUser.department, avatarUrl: newUser.avatarUrl };
