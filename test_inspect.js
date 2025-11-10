@@ -29,12 +29,12 @@ async function testInspectQuery() {
 
       // Custom populate for deviceId based on deviceType
       const deviceModels = {
-        'Laptop': require('./models/Laptop'),
-        'Monitor': require('./models/Monitor'),
-        'Printer': require('./models/Printer'),
-        'Projector': require('./models/Projector'),
-        'Tool': require('./models/Tool'),
-        'Phone': require('./models/Phone')
+        'laptop': require('./models/Laptop'),
+        'monitor': require('./models/Monitor'),
+        'printer': require('./models/Printer'),
+        'projector': require('./models/Projector'),
+        'tool': require('./models/Tool'),
+        'phone': require('./models/Phone')
       };
 
       if (inspection.deviceId && inspection.deviceType && deviceModels[inspection.deviceType]) {
