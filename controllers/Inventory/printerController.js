@@ -264,12 +264,15 @@ exports.revokePrinter = async (req, res) => {
 exports.updatePrinterStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, brokenReason } = req.body;
+    const { status, brokenReason, brokenDescription } = req.body;
     if (!['Active', 'Standby', 'Broken', 'PendingDocumentation'].includes(status)) return res.status(400).json({ message: 'Trạng thái không hợp lệ' });
     if (status === 'Broken' && !brokenReason) return res.status(400).json({ error: 'Lý do báo hỏng là bắt buộc!' });
     const printer = await Printer.findById(id);
     if (!printer) return res.status(404).json({ message: 'Không tìm thấy thiết bị' });
-    if (status === 'Broken') printer.brokenReason = brokenReason || 'Không xác định';
+    if (status === 'Broken') {
+      printer.brokenReason = brokenReason || 'Không xác định';
+      printer.brokenDescription = brokenDescription || null;
+    }
     printer.status = status;
     await printer.save();
     res.status(200).json(printer);

@@ -232,12 +232,15 @@ exports.revokeProjector = async (req, res) => {
 exports.updateProjectorStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, brokenReason } = req.body;
+    const { status, brokenReason, brokenDescription } = req.body;
     if (!['Active', 'Standby', 'Broken', 'PendingDocumentation'].includes(status)) return res.status(400).json({ message: 'Trạng thái không hợp lệ' });
     if (status === 'Broken' && !brokenReason) return res.status(400).json({ error: 'Lý do báo hỏng là bắt buộc!' });
     const projector = await Projector.findById(id);
     if (!projector) return res.status(404).json({ message: 'Không tìm thấy thiết bị' });
-    if (status === 'Broken') projector.brokenReason = brokenReason || 'Không xác định';
+    if (status === 'Broken') {
+      projector.brokenReason = brokenReason || 'Không xác định';
+      projector.brokenDescription = brokenDescription || null;
+    }
     projector.status = status;
     await projector.save();
     res.status(200).json(projector);

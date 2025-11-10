@@ -25,6 +25,7 @@ const laptopSchema = new mongoose.Schema(
     room: { type: mongoose.Schema.Types.ObjectId, ref: 'Room' },
     status: { type: String, enum: ['Active', 'Standby', 'Broken', 'PendingDocumentation'] },
     brokenReason: { type: String, default: null },
+    brokenDescription: { type: String, default: null },
     specs: {
       processor: { type: String },
       ram: { type: String },

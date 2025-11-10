@@ -282,12 +282,15 @@ exports.revokeMonitor = async (req, res) => {
 exports.updateMonitorStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, brokenReason } = req.body;
+    const { status, brokenReason, brokenDescription } = req.body;
     if (!['Active', 'Standby', 'Broken', 'PendingDocumentation'].includes(status)) return res.status(400).json({ message: 'Trạng thái không hợp lệ' });
     if (status === 'Broken' && !brokenReason) return res.status(400).json({ error: 'Lý do báo hỏng là bắt buộc!' });
     const monitor = await Monitor.findById(id);
     if (!monitor) return res.status(404).json({ message: 'Không tìm thấy thiết bị' });
-    if (status === 'Broken') monitor.brokenReason = brokenReason || 'Không xác định';
+    if (status === 'Broken') {
+      monitor.brokenReason = brokenReason || 'Không xác định';
+      monitor.brokenDescription = brokenDescription || null;
+    }
     monitor.status = status;
     await monitor.save();
     res.status(200).json(monitor);

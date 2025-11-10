@@ -212,12 +212,15 @@ exports.revokeTool = async (req, res) => {
 exports.updateToolStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, brokenReason } = req.body;
+    const { status, brokenReason, brokenDescription } = req.body;
     if (!['Active', 'Standby', 'Broken', 'PendingDocumentation'].includes(status)) return res.status(400).json({ message: 'Trạng thái không hợp lệ' });
     if (status === 'Broken' && !brokenReason) return res.status(400).json({ error: 'Lý do báo hỏng là bắt buộc!' });
     const tool = await Tool.findById(id);
     if (!tool) return res.status(404).json({ message: 'Không tìm thấy thiết bị' });
-    if (status === 'Broken') tool.brokenReason = brokenReason || 'Không xác định';
+    if (status === 'Broken') {
+      tool.brokenReason = brokenReason || 'Không xác định';
+      tool.brokenDescription = brokenDescription || null;
+    }
     tool.status = status;
     await tool.save();
     res.status(200).json(tool);

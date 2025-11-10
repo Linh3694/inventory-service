@@ -267,12 +267,15 @@ exports.revokeLaptop = async (req, res) => {
 exports.updateLaptopStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, brokenReason } = req.body;
+    const { status, brokenReason, brokenDescription } = req.body;
     if (!['Active', 'Standby', 'Broken', 'PendingDocumentation'].includes(status)) return res.status(400).json({ message: 'Trạng thái không hợp lệ' });
     if (status === 'Broken' && !brokenReason) return res.status(400).json({ error: 'Lý do báo hỏng là bắt buộc!' });
     const laptop = await Laptop.findById(id);
     if (!laptop) return res.status(404).json({ message: 'Không tìm thấy thiết bị' });
-    if (status === 'Broken') { laptop.brokenReason = brokenReason || 'Không xác định'; }
+    if (status === 'Broken') {
+      laptop.brokenReason = brokenReason || 'Không xác định';
+      laptop.brokenDescription = brokenDescription || null;
+    }
     laptop.status = status;
     await laptop.save();
     await redisService.deleteDeviceCache('laptop');
