@@ -97,17 +97,52 @@ exports.updateProjector = async (req, res) => {
   try {
     const { id } = req.params;
     const { name, manufacturer, serial, assigned, status, releaseYear, specs, type, room, reason } = req.body;
-    if (assigned && !Array.isArray(assigned)) return res.status(400).json({ message: 'Assigned phải là mảng ID người sử dụng hợp lệ.' });
-    if (room && !mongoose.Types.ObjectId.isValid(room)) return res.status(400).json({ message: 'Room ID không hợp lệ!' });
+
+    if (assigned && !Array.isArray(assigned)) {
+      return res.status(400).json({ message: 'Assigned phải là mảng ID người sử dụng hợp lệ.' });
+    }
+
+    // Handle room: can be MongoDB ObjectId, Frappe room ID (string), or null to unassign
+    let resolvedRoomId = room;
+    if (room !== undefined) {
+      if (room === null) {
+        // Explicitly unassign room
+        resolvedRoomId = null;
+      } else if (!mongoose.Types.ObjectId.isValid(room)) {
+        return res.status(400).json({ message: 'Room ID không hợp lệ!' });
+      }
+    }
+
     let validStatus = status;
-    if (!['Active', 'Standby', 'Broken', 'PendingDocumentation'].includes(status)) {
+    if (status && !['Active', 'Standby', 'Broken', 'PendingDocumentation'].includes(status)) {
       const oldProjector = await Projector.findById(id).lean();
       if (!oldProjector) return res.status(404).json({ message: 'Không tìm thấy projector.' });
       validStatus = oldProjector.status;
     }
-    if (validStatus === 'Broken' && !reason) return res.status(400).json({ message: "Lý do báo hỏng là bắt buộc khi trạng thái là 'Broken'!" });
-    if (assigned && assigned.length > 0 && validStatus === 'Standby') validStatus = 'PendingDocumentation';
-    const updatedData = { name, manufacturer, serial, assigned, status: validStatus, releaseYear, specs, type, room, reason: validStatus === 'Broken' ? reason : undefined, assignmentHistory: req.body.assignmentHistory };
+
+    if (validStatus === 'Broken' && !reason) {
+      return res.status(400).json({ message: "Lý do báo hỏng là bắt buộc khi trạng thái là 'Broken'!" });
+    }
+
+    if (assigned && assigned.length > 0 && validStatus === 'Standby') {
+      validStatus = 'PendingDocumentation';
+    }
+
+    const updatedData = {
+      ...(name !== undefined && { name }),
+      ...(manufacturer !== undefined && { manufacturer }),
+      ...(serial !== undefined && { serial }),
+      ...(assigned !== undefined && { assigned }),
+      ...(validStatus && { status: validStatus }),
+      ...(releaseYear !== undefined && { releaseYear }),
+      ...(specs !== undefined && { specs }),
+      ...(type !== undefined && { type }),
+      ...(resolvedRoomId !== undefined && { room: resolvedRoomId }),
+      ...(validStatus === 'Broken' && reason && { reason }),
+      ...(req.body.assignmentHistory && { assignmentHistory: req.body.assignmentHistory })
+    };
+
+    console.log('📝 Updating projector with:', updatedData);
     const projector = await Projector.findByIdAndUpdate(id, updatedData, { new: true });
     if (!projector) return res.status(404).json({ message: 'Không tìm thấy projector' });
     res.json(projector);

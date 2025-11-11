@@ -149,13 +149,41 @@ exports.updatePhone = async (req, res) => {
   try {
     const { id } = req.params;
     const { name, manufacturer, serial, imei1, imei2, phoneNumber, assigned, status, releaseYear, specs, type, room, reason } = req.body;
-    if (assigned && !Array.isArray(assigned)) return res.status(400).json({ message: 'Assigned phải là mảng ID người sử dụng hợp lệ.' });
-    if (room && !mongoose.Types.ObjectId.isValid(room)) return res.status(400).json({ message: 'Room ID không hợp lệ!' });
-    const updated = await Phone.findByIdAndUpdate(
-      id,
-      { name, manufacturer, serial, imei1, imei2, phoneNumber, assigned, status, releaseYear, specs, type, room, reason: status === 'Broken' ? reason : undefined, assignmentHistory: req.body.assignmentHistory },
-      { new: true }
-    );
+
+    if (assigned && !Array.isArray(assigned)) {
+      return res.status(400).json({ message: 'Assigned phải là mảng ID người sử dụng hợp lệ.' });
+    }
+
+    // Handle room: can be MongoDB ObjectId, Frappe room ID (string), or null to unassign
+    let resolvedRoomId = room;
+    if (room !== undefined) {
+      if (room === null) {
+        // Explicitly unassign room
+        resolvedRoomId = null;
+      } else if (!mongoose.Types.ObjectId.isValid(room)) {
+        return res.status(400).json({ message: 'Room ID không hợp lệ!' });
+      }
+    }
+
+    const updatedData = {
+      ...(name !== undefined && { name }),
+      ...(manufacturer !== undefined && { manufacturer }),
+      ...(serial !== undefined && { serial }),
+      ...(imei1 !== undefined && { imei1 }),
+      ...(imei2 !== undefined && { imei2 }),
+      ...(phoneNumber !== undefined && { phoneNumber }),
+      ...(assigned !== undefined && { assigned }),
+      ...(status && { status }),
+      ...(releaseYear !== undefined && { releaseYear }),
+      ...(specs !== undefined && { specs }),
+      ...(type !== undefined && { type }),
+      ...(resolvedRoomId !== undefined && { room: resolvedRoomId }),
+      ...(status === 'Broken' && reason && { reason }),
+      ...(req.body.assignmentHistory && { assignmentHistory: req.body.assignmentHistory })
+    };
+
+    console.log('📝 Updating phone with:', updatedData);
+    const updated = await Phone.findByIdAndUpdate(id, updatedData, { new: true });
     if (!updated) return res.status(404).json({ message: 'Không tìm thấy phone' });
     await redisService.deleteDeviceCache('phone');
     res.json(updated);

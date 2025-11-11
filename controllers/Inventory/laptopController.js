@@ -130,22 +130,27 @@ exports.updateLaptop = async (req, res) => {
       return res.status(400).json({ message: 'Assigned phải là mảng ID người sử dụng hợp lệ.' });
     }
     
-    // Handle room: can be MongoDB ObjectId or Frappe room ID (string)
+    // Handle room: can be MongoDB ObjectId, Frappe room ID (string), or null to unassign
     let resolvedRoomId = room;
-    if (room) {
-      try {
-        resolvedRoomId = await resolveRoomId(room);
-        if (!resolvedRoomId) {
-          return res.status(400).json({ 
-            message: 'Phòng không tồn tại',
-            details: `Cannot find room with ID: ${room}` 
+    if (room !== undefined) {
+      if (room === null) {
+        // Explicitly unassign room
+        resolvedRoomId = null;
+      } else {
+        try {
+          resolvedRoomId = await resolveRoomId(room);
+          if (!resolvedRoomId) {
+            return res.status(400).json({
+              message: 'Phòng không tồn tại',
+              details: `Cannot find room with ID: ${room}`
+            });
+          }
+        } catch (error) {
+          return res.status(400).json({
+            message: 'Lỗi khi xử lý phòng',
+            details: error.message
           });
         }
-      } catch (error) {
-        return res.status(400).json({ 
-          message: 'Lỗi khi xử lý phòng',
-          details: error.message 
-        });
       }
     }
     
@@ -165,15 +170,15 @@ exports.updateLaptop = async (req, res) => {
     }
     
     const updatedData = {
-      ...(name && { name }),
-      ...(manufacturer && { manufacturer }),
-      ...(serial && { serial }),
-      ...(assigned && { assigned }),
+      ...(name !== undefined && { name }),
+      ...(manufacturer !== undefined && { manufacturer }),
+      ...(serial !== undefined && { serial }),
+      ...(assigned !== undefined && { assigned }),
       ...(validStatus && { status: validStatus }),
-      ...(releaseYear && { releaseYear }),
-      ...(specs && { specs }),
-      ...(type && { type }),
-      ...(resolvedRoomId && { room: resolvedRoomId }),
+      ...(releaseYear !== undefined && { releaseYear }),
+      ...(specs !== undefined && { specs }),
+      ...(type !== undefined && { type }),
+      ...(resolvedRoomId !== undefined && { room: resolvedRoomId }),
       ...(validStatus === 'Broken' && reason && { reason }),
       ...(req.body.assignmentHistory && { assignmentHistory: req.body.assignmentHistory })
     };
