@@ -72,6 +72,7 @@ class DeviceService {
             .limit(limit)
             .sort(sort)
             .select('_id name serial status type manufacturer assigned createdAt updatedAt')
+            .populate('assigned', 'fullname email jobTitle avatarUrl department')
             .lean();
 
           if (items.length > 0) {
