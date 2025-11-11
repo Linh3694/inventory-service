@@ -5,20 +5,44 @@ const FRAPPE_API_URL = process.env.FRAPPE_API_URL || 'https://admin.sis.wellspri
 
 // Helper function to format Frappe room data
 function formatFrappeRoom(frappeRoom) {
+  // Handle building information - prioritize building object if available
+  let buildingInfo = {};
+  if (frappeRoom.building && typeof frappeRoom.building === 'object') {
+    // New webhook format with full building object
+    buildingInfo = {
+      id: frappeRoom.building.name,
+      name: frappeRoom.building.title_vn || frappeRoom.building.title_en,
+      name_vn: frappeRoom.building.title_vn,
+      name_en: frappeRoom.building.title_en,
+      short_title: frappeRoom.building.short_title,
+      campus_id: frappeRoom.building.campus_id
+    };
+  } else {
+    // Legacy format or fallback
+    buildingInfo = {
+      id: frappeRoom.building_id || frappeRoom.building,
+      name: frappeRoom.building_name || frappeRoom.building_title,
+      campus_id: frappeRoom.campus_id
+    };
+  }
+
   return {
     frappeRoomId: frappeRoom.name || frappeRoom.room_id,
-    name: frappeRoom.room_name || frappeRoom.title_vn || frappeRoom.name,
-    room_number: frappeRoom.room_number || frappeRoom.short_title,
-    room_name: frappeRoom.room_name || frappeRoom.title_vn,
-    room_name_en: frappeRoom.room_name_en || frappeRoom.title_en,
+    name: frappeRoom.title_vn || frappeRoom.room_name || frappeRoom.name,
+    room_number: frappeRoom.short_title || frappeRoom.room_number,
+    room_name: frappeRoom.title_vn || frappeRoom.room_name,
+    room_name_en: frappeRoom.title_en || frappeRoom.room_name_en,
     short_title: frappeRoom.short_title,
-    building: frappeRoom.building || frappeRoom.building_id,
-    floor: frappeRoom.floor,
-    block: frappeRoom.block,
+    building: buildingInfo.id,
+    building_name: buildingInfo.name,
+    building_name_vn: buildingInfo.name_vn,
+    building_name_en: buildingInfo.name_en,
+    building_short_title: buildingInfo.short_title,
+    campus_id: frappeRoom.campus_id || buildingInfo.campus_id,
     capacity: frappeRoom.capacity,
     room_type: frappeRoom.room_type,
-    status: frappeRoom.status || 'Active',
-    disabled: frappeRoom.disabled || false,
+    status: 'Active', // Always active since we removed status field
+    disabled: false,  // Always enabled since we removed disabled field
     frappeDoc: frappeRoom,
     lastSyncAt: new Date()
   };
@@ -106,7 +130,7 @@ async function getAllFrappeRooms(token) {
             console.log(`📡 Trying endpoint: ${endpoint}`);
             response = await axios.get(endpoint, {
               params: {
-                fields: JSON.stringify(['name', 'room_name', 'room_number', 'building', 'floor', 'block', 'capacity', 'room_type', 'status', 'disabled']),
+                fields: JSON.stringify(['name', 'title_vn', 'title_en', 'short_title', 'building_id', 'campus_id', 'capacity', 'room_type']),
                 limit_start: 0,
                 limit_page_length: 500
               },
@@ -274,7 +298,7 @@ exports.debugFetchRooms = async (req, res) => {
           `${FRAPPE_API_URL}/api/resource/ERP%20Administrative%20Room`,
           {
             params: {
-              fields: JSON.stringify(['name', 'room_name', 'room_number', 'building', 'floor', 'block', 'capacity', 'room_type', 'status', 'disabled']),
+              fields: JSON.stringify(['name', 'title_vn', 'title_en', 'short_title', 'building_id', 'campus_id', 'capacity', 'room_type']),
               limit_start: 0,
               limit_page_length: 10,
               order_by: 'name asc'
@@ -310,12 +334,13 @@ exports.debugFetchRooms = async (req, res) => {
 
     const sampleRooms = roomList.slice(0, 5).map(room => ({
       name: room.name,
-      room_name: room.room_name || room.title_vn || room.name,
+      room_name: room.title_vn || room.room_name || room.name,
+      room_name_en: room.title_en || room.room_name_en,
+      short_title: room.short_title,
       building: room.building_id || room.building,
-      floor: room.floor,
-      room_number: room.room_number,
+      campus_id: room.campus_id,
       capacity: room.capacity,
-      status: room.status
+      room_type: room.room_type
     }));
 
     res.status(200).json({
