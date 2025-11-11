@@ -47,6 +47,11 @@ app.use('/api/inventory/tools', require('./routes/Inventory/tool'));
 app.use('/api/inventory/inspect', require('./routes/Inventory/inspect'));
 app.use('/api/inventory/activity', require('./routes/Inventory/activityRoutes'));
 
+// Additional direct routes for room devices (for frontend compatibility)
+const roomController = require('./controllers/roomController');
+const { authenticate } = require('./middleware/validateToken');
+app.get('/api/inventory/room-devices', authenticate, roomController.getDevicesInRoom);
+
 // Bootstrap
 async function start() {
   const port = Number(process.env.PORT || 4010);

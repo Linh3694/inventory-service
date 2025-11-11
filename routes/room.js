@@ -22,5 +22,13 @@ router.get('/:roomId', authenticate, roomController.getRoomById);
 // 🔔 ENDPOINT 6: Webhook - Room changed in Frappe (NO AUTH)
 router.post('/webhook/frappe-room-changed', roomController.webhookRoomChanged);
 
+// 📱 ENDPOINT 7: Get devices in a room (AUTHENTICATED)
+// Route: GET /api/inventory/room-devices?roomId={roomId}&skip=0&limit=100
+// We need to add a root level route handler since this is accessed via different path
+router.get('/room-devices', authenticate, roomController.getDevicesInRoom);
+
+// Also keep this for future reference
+router.get('/devices/list', authenticate, roomController.getDevicesInRoom);
+
 module.exports = router;
 

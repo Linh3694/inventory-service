@@ -1,5 +1,7 @@
 const axios = require('axios');
+const mongoose = require('mongoose');
 const Room = require('../models/Room');
+const DeviceService = require('../services/deviceService');
 const { populateBuildingInRoom } = require('../utils/roomHelper');
 
 const FRAPPE_API_URL = process.env.FRAPPE_API_URL || 'https://admin.sis.wellspring.edu.vn';
@@ -636,6 +638,65 @@ exports.webhookRoomChanged = async (req, res) => {
     res.status(500).json({
       success: false,
       message: error.message
+    });
+  }
+};
+
+// ✅ ENDPOINT 7: Get devices in a room
+exports.getDevicesInRoom = async (req, res) => {
+  try {
+    const { roomId } = req.query;
+    const { skip = 0, limit = 100 } = req.query;
+
+    // Validation
+    if (!roomId) {
+      return res.status(400).json({
+        success: false,
+        message: 'roomId is required'
+      });
+    }
+
+    // Validate ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(roomId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid roomId format'
+      });
+    }
+
+    console.log(`🔍 [Room Devices] Fetching devices for room: ${roomId}`);
+
+    // Fetch devices using DeviceService
+    const devices = await DeviceService.getDevicesByRoom(
+      roomId,
+      {
+        skip: parseInt(skip),
+        limit: parseInt(limit)
+      }
+    );
+
+    // Get total count
+    const totalCount = await DeviceService.getDeviceCountByRoom(roomId);
+
+    console.log(`✅ [Room Devices] Found ${devices.length} devices in room ${roomId}`);
+
+    res.status(200).json({
+      success: true,
+      data: devices,
+      pagination: {
+        skip: parseInt(skip),
+        limit: parseInt(limit),
+        total: totalCount,
+        hasMore: (parseInt(skip) + parseInt(limit)) < totalCount
+      },
+      message: `Retrieved ${devices.length} devices`
+    });
+  } catch (error) {
+    console.error('❌ [Room Devices] Error in getDevicesInRoom:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to fetch devices',
+      data: []
     });
   }
 };
