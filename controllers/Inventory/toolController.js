@@ -3,6 +3,9 @@ const User = require('../../models/User');
 const mongoose = require('mongoose');
 const path = require('path');
 const fs = require('fs');
+const redisService = require('../../services/redisService');
+const { ensureFullnameInHistory } = require('../../utils/assignmentHelper');
+const { populateBuildingInRoom, ROOM_POPULATE_FIELDS } = require('../../utils/roomHelper');
 
 exports.getTools = async (req, res) => {
   try {
@@ -27,7 +30,7 @@ exports.getTools = async (req, res) => {
       const toolIds = tools.map((t) => t._id);
       const populated = await Tool.find({ _id: { $in: toolIds } })
         .populate('assigned', 'fullname jobTitle department avatarUrl')
-        .populate('room', 'name location status')
+        .populate('room', ROOM_POPULATE_FIELDS)
         .populate('assignmentHistory.user', 'fullname email jobTitle avatarUrl')
         .populate('assignmentHistory.assignedBy', 'fullname email title')
         .populate('assignmentHistory.revokedBy', 'fullname email')
@@ -37,13 +40,13 @@ exports.getTools = async (req, res) => {
       tools = await Tool.find(query)
         .sort({ createdAt: -1 })
         .populate('assigned', 'fullname jobTitle department avatarUrl')
-        .populate('room', 'name location status')
+        .populate('room', ROOM_POPULATE_FIELDS)
         .populate('assignmentHistory.user', 'fullname email jobTitle avatarUrl')
         .populate('assignmentHistory.assignedBy', 'fullname email title')
         .populate('assignmentHistory.revokedBy', 'fullname email')
         .lean();
     }
-    const populatedTools = tools.map((t) => ({ ...t, room: t.room ? { ...t.room, location: t.room.location?.map((loc) => `${loc.building}, tầng ${loc.floor}`) || ['Không xác định'] } : { name: 'Không xác định', location: ['Không xác định'] } }));
+    const populatedTools = tools.map((t) => ({ ...t, room: t.room ? populateBuildingInRoom(t.room) : null }));
     return res.status(200).json({ populatedTools });
   } catch (error) {
     console.error('Error fetching tools:', error.message);
@@ -284,8 +287,18 @@ exports.searchTools = async (req, res) => {
     const { query } = req.query;
     if (!query || query.trim() === '') return res.status(400).json({ message: 'Từ khóa tìm kiếm không hợp lệ!' });
     const searchQuery = { $or: [ { name: { $regex: query, $options: 'i' } }, { serial: { $regex: query, $options: 'i' } }, { 'assigned.fullname': { $regex: query, $options: 'i' } } ] };
-    const tools = await Tool.find(searchQuery).populate('assigned', 'fullname jobTitle department avatarUrl').populate('room', 'name location status').lean();
-    res.status(200).json(tools);
+    const tools = await Tool.find(searchQuery)
+      .populate('assigned', 'fullname jobTitle department avatarUrl')
+      .populate('room', ROOM_POPULATE_FIELDS)
+      .lean();
+
+    // Transform room data to include building object
+    const transformedTools = tools.map(tool => ({
+      ...tool,
+      room: tool.room ? populateBuildingInRoom(tool.room) : null
+    }));
+
+    res.status(200).json(transformedTools);
   } catch (error) {
     console.error('Error during search:', error.message);
     res.status(500).json({ message: 'Lỗi khi tìm kiếm tools', error: error.message });
@@ -307,12 +320,19 @@ exports.getToolById = async (req, res) => {
     const { id } = req.params;
     const tool = await Tool.findById(id)
       .populate('assigned', 'fullname email jobTitle avatarUrl department')
-      .populate('room', 'name location status')
+      .populate('room', ROOM_POPULATE_FIELDS)
       .populate('assignmentHistory.user', 'fullname email jobTitle avatarUrl')
       .populate('assignmentHistory.assignedBy', 'fullname email jobTitle avatarUrl')
       .populate('assignmentHistory.revokedBy', 'fullname email jobTitle avatarUrl');
     if (!tool) return res.status(404).json({ message: 'Không tìm thấy tool' });
-    res.status(200).json(tool);
+
+    // Transform room data to include building object
+    const transformedTool = {
+      ...tool.toObject(),
+      room: tool.room ? populateBuildingInRoom(tool.room) : null
+    };
+
+    res.status(200).json(transformedTool);
   } catch (error) {
     console.error('Lỗi khi lấy thông tin tool:', error);
     res.status(500).json({ message: 'Lỗi máy chủ', error });

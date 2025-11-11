@@ -7,6 +7,7 @@ const Room = require('../../models/Room');
 const redisService = require('../../services/redisService');
 const { resolveRoomId } = require('../../utils/roomResolver');
 const { ensureFullnameInHistory } = require('../../utils/assignmentHelper');
+const { populateBuildingInRoom, ROOM_POPULATE_FIELDS } = require('../../utils/roomHelper');
 
 // Copy logic từ backend, giữ nguyên hành vi
 // Lấy danh sách laptop với pagination và cache
@@ -60,7 +61,7 @@ exports.getLaptops = async (req, res) => {
       const laptopIds = laptops.map((l) => l._id);
       const populated = await Laptop.find({ _id: { $in: laptopIds } })
         .populate('assigned', 'fullname jobTitle department avatarUrl')
-        .populate('room', 'name room_number building floor block status')
+        .populate('room', ROOM_POPULATE_FIELDS)
         .populate('assignmentHistory.user', 'fullname email jobTitle avatarUrl')
         .populate('assignmentHistory.assignedBy', 'fullname email title')
         .populate('assignmentHistory.revokedBy', 'fullname email')
@@ -73,7 +74,7 @@ exports.getLaptops = async (req, res) => {
         .skip(skip)
         .limit(limit)
         .populate('assigned', 'fullname jobTitle department avatarUrl')
-        .populate('room', 'name room_number building floor block status')
+        .populate('room', ROOM_POPULATE_FIELDS)
         .populate('assignmentHistory.user', 'fullname email jobTitle avatarUrl')
         .populate('assignmentHistory.assignedBy', 'fullname email title')
         .populate('assignmentHistory.revokedBy', 'fullname email')
@@ -82,10 +83,7 @@ exports.getLaptops = async (req, res) => {
     }
     const populatedLaptops = laptops.map((l) => ({
       ...l,
-      room: l.room ? {
-        ...l.room,
-        location: l.room.getDisplayLocation ? [l.room.getDisplayLocation()] : ['Không xác định']
-      } : { name: 'Không xác định', location: ['Không xác định'] },
+      room: l.room ? populateBuildingInRoom(l.room) : null,
     }));
     if (!hasFilters) {
       await redisService.setDevicePage('laptop', page, limit, populatedLaptops, totalItems, 300);
@@ -185,12 +183,19 @@ exports.updateLaptop = async (req, res) => {
     
     console.log('📝 Updating laptop with:', updatedData);
     const laptop = await Laptop.findByIdAndUpdate(id, updatedData, { new: true })
-      .populate('room', 'frappeRoomId name room_name building capacity');
+      .populate('room', ROOM_POPULATE_FIELDS);
     
     if (!laptop) return res.status(404).json({ message: 'Không tìm thấy laptop' });
-    
+
     await redisService.deleteDeviceCache('laptop');
-    res.json(laptop);
+
+    // Transform room data to include building object
+    const transformedLaptop = {
+      ...laptop.toObject(),
+      room: laptop.room ? populateBuildingInRoom(laptop.room) : null
+    };
+
+    res.json(transformedLaptop);
   } catch (error) {
     console.error('❌ Error updating laptop:', error.message);
     res.status(400).json({ message: 'Error updating laptop', error: error.message });
@@ -379,8 +384,18 @@ exports.searchLaptops = async (req, res) => {
     const { query } = req.query;
     if (!query || query.trim() === '') return res.status(400).json({ message: 'Từ khóa tìm kiếm không hợp lệ!' });
     const searchQuery = { $or: [ { name: { $regex: query, $options: 'i' } }, { serial: { $regex: query, $options: 'i' } }, { 'assigned.fullname': { $regex: query, $options: 'i' } } ] };
-    const laptops = await Laptop.find(searchQuery).populate('assigned', 'fullname jobTitle department avatarUrl').populate('room', 'name location status').lean();
-    res.status(200).json(laptops);
+    const laptops = await Laptop.find(searchQuery)
+      .populate('assigned', 'fullname jobTitle department avatarUrl')
+      .populate('room', 'name room_number building floor block status building_name building_name_vn building_name_en building_short_title campus_id short_title frappeRoomId')
+      .lean();
+
+    // Transform room data to include building object
+    const transformedLaptops = laptops.map(laptop => ({
+      ...laptop,
+      room: laptop.room ? populateBuildingInRoom(laptop.room) : null
+    }));
+
+    res.status(200).json(transformedLaptops);
   } catch (error) {
     console.error('Error during search:', error.message);
     res.status(500).json({ message: 'Lỗi khi tìm kiếm laptops', error: error.message });
@@ -402,12 +417,19 @@ exports.getLaptopById = async (req, res) => {
   try {
     const laptop = await Laptop.findById(id)
       .populate('assigned', 'fullname email jobTitle avatarUrl department')
-      .populate('room', 'name location status')
+      .populate('room', 'name room_number building floor block status building_name building_name_vn building_name_en building_short_title campus_id short_title frappeRoomId')
       .populate('assignmentHistory.user', 'fullname email jobTitle avatarUrl')
       .populate('assignmentHistory.assignedBy', 'fullname email jobTitle avatarUrl')
       .populate('assignmentHistory.revokedBy', 'fullname email jobTitle avatarUrl');
     if (!laptop) return res.status(404).json({ message: 'Không tìm thấy laptop' });
-    res.status(200).json(laptop);
+
+    // Transform room data to include building object
+    const transformedLaptop = {
+      ...laptop.toObject(),
+      room: laptop.room ? populateBuildingInRoom(laptop.room) : null
+    };
+
+    res.status(200).json(transformedLaptop);
   } catch (error) {
     console.error('Lỗi khi lấy thông tin laptop:', error);
     res.status(500).json({ message: 'Lỗi máy chủ', error });

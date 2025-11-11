@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const redisService = require('../../services/redisService');
 const { ensureFullnameInHistory } = require('../../utils/assignmentHelper');
+const { populateBuildingInRoom, ROOM_POPULATE_FIELDS } = require('../../utils/roomHelper');
 
 exports.getPhones = async (req, res) => {
   try {
@@ -69,7 +70,7 @@ exports.getPhones = async (req, res) => {
       const ids = phones.map((p) => p._id);
       const populated = await Phone.find({ _id: { $in: ids } })
         .populate('assigned', 'fullname jobTitle department avatarUrl')
-        .populate('room', 'name location status')
+        .populate('room', ROOM_POPULATE_FIELDS)
         .populate('assignmentHistory.user', 'fullname email jobTitle avatarUrl')
         .populate('assignmentHistory.assignedBy', 'fullname email title')
         .populate('assignmentHistory.revokedBy', 'fullname email')
@@ -82,7 +83,7 @@ exports.getPhones = async (req, res) => {
         .skip(skip)
         .limit(limit)
         .populate('assigned', 'fullname jobTitle department avatarUrl')
-        .populate('room', 'name location status')
+        .populate('room', ROOM_POPULATE_FIELDS)
         .populate('assignmentHistory.user', 'fullname email jobTitle avatarUrl')
         .populate('assignmentHistory.assignedBy', 'fullname email title')
         .populate('assignmentHistory.revokedBy', 'fullname email')
@@ -92,7 +93,7 @@ exports.getPhones = async (req, res) => {
 
     const populatedPhones = phones.map((p) => ({
       ...p,
-      room: p.room ? { ...p.room, location: p.room.location?.map((loc) => `${loc.building}, tầng ${loc.floor}`) || ['Không xác định'] } : { name: 'Không xác định', location: ['Không xác định'] },
+      room: p.room ? populateBuildingInRoom(p.room) : null,
     }));
 
     if (!hasFilters) await redisService.setDevicePage('phone', page, limit, populatedPhones, totalItems, 300);
@@ -110,15 +111,21 @@ exports.getPhoneById = async (req, res) => {
     const { id } = req.params;
     const phone = await Phone.findById(id)
       .populate('assigned', 'fullname email jobTitle avatarUrl')
-      .populate('room', 'name location status')
+      .populate('room', ROOM_POPULATE_FIELDS)
       .populate('assignmentHistory.user', 'fullname email jobTitle avatarUrl')
       .populate('assignmentHistory.assignedBy', 'fullname email jobTitle avatarUrl')
       .populate('assignmentHistory.revokedBy', 'fullname email jobTitle avatarUrl');
     if (!phone) return res.status(404).json({ message: 'Không tìm thấy phone' });
-    
+
     ensureFullnameInHistory(phone);
-    
-    res.status(200).json(phone);
+
+    // Transform room data to include building object
+    const transformedPhone = {
+      ...phone.toObject(),
+      room: phone.room ? populateBuildingInRoom(phone.room) : null
+    };
+
+    res.status(200).json(transformedPhone);
   } catch (error) {
     res.status(500).json({ message: 'Lỗi máy chủ', error });
   }

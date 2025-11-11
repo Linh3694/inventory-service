@@ -4,6 +4,8 @@ const mongoose = require('mongoose');
 const path = require('path');
 const fs = require('fs');
 const redisService = require('../../services/redisService');
+const { ensureFullnameInHistory } = require('../../utils/assignmentHelper');
+const { populateBuildingInRoom, ROOM_POPULATE_FIELDS } = require('../../utils/roomHelper');
 
 exports.getProjectors = async (req, res) => {
   try {
@@ -41,7 +43,7 @@ exports.getProjectors = async (req, res) => {
       const ids = projectors.map((p) => p._id);
       const populated = await Projector.find({ _id: { $in: ids } })
         .populate('assigned', 'fullname jobTitle department avatarUrl')
-        .populate('room', 'name location status')
+        .populate('room', ROOM_POPULATE_FIELDS)
         .populate('assignmentHistory.user', 'fullname email jobTitle avatarUrl')
         .populate('assignmentHistory.assignedBy', 'fullname email title')
         .populate('assignmentHistory.revokedBy', 'fullname email')
@@ -54,13 +56,13 @@ exports.getProjectors = async (req, res) => {
         .skip(skip)
         .limit(limit)
         .populate('assigned', 'fullname jobTitle department avatarUrl')
-        .populate('room', 'name location status')
+        .populate('room', ROOM_POPULATE_FIELDS)
         .populate('assignmentHistory.user', 'fullname email jobTitle avatarUrl')
         .populate('assignmentHistory.assignedBy', 'fullname email title')
         .populate('assignmentHistory.revokedBy', 'fullname email')
         .lean();
     }
-    const populatedProjectors = projectors.map((p) => ({ ...p, room: p.room ? { ...p.room, location: p.room.location?.map((loc) => `${loc.building}, tầng ${loc.floor}`) || ['Không xác định'] } : { name: 'Không xác định', location: ['Không xác định'] } }));
+    const populatedProjectors = projectors.map((p) => ({ ...p, room: p.room ? populateBuildingInRoom(p.room) : null }));
     if (!hasFilters) await redisService.setDevicePage('projector', page, limit, populatedProjectors, totalItems, 300);
     const totalPages = Math.ceil(totalItems / limit);
     return res.status(200).json({ populatedProjectors, pagination: { currentPage: page, totalPages, totalItems, itemsPerPage: limit, hasNext: page < totalPages, hasPrev: page > 1 } });
@@ -304,8 +306,18 @@ exports.searchProjectors = async (req, res) => {
     const { query } = req.query;
     if (!query || query.trim() === '') return res.status(400).json({ message: 'Từ khóa tìm kiếm không hợp lệ!' });
     const searchQuery = { $or: [ { name: { $regex: query, $options: 'i' } }, { serial: { $regex: query, $options: 'i' } }, { 'assigned.fullname': { $regex: query, $options: 'i' } } ] };
-    const projectors = await Projector.find(searchQuery).populate('assigned', 'fullname jobTitle department avatarUrl').populate('room', 'name location status').lean();
-    res.status(200).json(projectors);
+    const projectors = await Projector.find(searchQuery)
+      .populate('assigned', 'fullname jobTitle department avatarUrl')
+      .populate('room', ROOM_POPULATE_FIELDS)
+      .lean();
+
+    // Transform room data to include building object
+    const transformedProjectors = projectors.map(projector => ({
+      ...projector,
+      room: projector.room ? populateBuildingInRoom(projector.room) : null
+    }));
+
+    res.status(200).json(transformedProjectors);
   } catch (error) {
     console.error('Error during search:', error.message);
     res.status(500).json({ message: 'Lỗi khi tìm kiếm projectors', error: error.message });
@@ -327,12 +339,19 @@ exports.getProjectorById = async (req, res) => {
     const { id } = req.params;
     const projector = await Projector.findById(id)
       .populate('assigned', 'fullname email jobTitle avatarUrl department')
-      .populate('room', 'name location status')
+      .populate('room', ROOM_POPULATE_FIELDS)
       .populate('assignmentHistory.user', 'fullname email jobTitle avatarUrl')
       .populate('assignmentHistory.assignedBy', 'fullname email jobTitle avatarUrl')
       .populate('assignmentHistory.revokedBy', 'fullname email jobTitle avatarUrl');
     if (!projector) return res.status(404).json({ message: 'Không tìm thấy projector' });
-    res.status(200).json(projector);
+
+    // Transform room data to include building object
+    const transformedProjector = {
+      ...projector.toObject(),
+      room: projector.room ? populateBuildingInRoom(projector.room) : null
+    };
+
+    res.status(200).json(transformedProjector);
   } catch (error) {
     console.error('Lỗi khi lấy thông tin projector:', error);
     res.status(500).json({ message: 'Lỗi máy chủ', error });

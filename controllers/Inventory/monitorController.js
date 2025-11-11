@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const redisService = require('../../services/redisService');
 const { ensureFullnameInHistory } = require('../../utils/assignmentHelper');
+const { populateBuildingInRoom, ROOM_POPULATE_FIELDS } = require('../../utils/roomHelper');
 
 // Rút gọn: copy hành vi từ backend
 exports.getMonitors = async (req, res) => {
@@ -56,7 +57,7 @@ exports.getMonitors = async (req, res) => {
       const monitorIds = monitors.map((m) => m._id);
       const populated = await Monitor.find({ _id: { $in: monitorIds } })
         .populate('assigned', 'fullname jobTitle department avatarUrl email')
-        .populate('room', 'name location status')
+        .populate('room', ROOM_POPULATE_FIELDS)
         .populate('assignmentHistory.user', 'fullname email jobTitle avatarUrl')
         .populate('assignmentHistory.assignedBy', 'fullname email jobTitle')
         .populate('assignmentHistory.revokedBy', 'fullname email')
@@ -71,7 +72,7 @@ exports.getMonitors = async (req, res) => {
         .skip(skip)
         .limit(limit)
         .populate('assigned', 'fullname jobTitle department avatarUrl email')
-        .populate('room', 'name location status')
+        .populate('room', ROOM_POPULATE_FIELDS)
         .populate('assignmentHistory.user', 'fullname email jobTitle avatarUrl')
         .populate('assignmentHistory.assignedBy', 'fullname email jobTitle')
         .populate('assignmentHistory.revokedBy', 'fullname email')
@@ -82,7 +83,7 @@ exports.getMonitors = async (req, res) => {
     }
     const populatedMonitors = monitors.map((m) => ({
       ...m,
-      room: m.room ? { ...m.room, location: m.room.location?.map((loc) => `${loc.building}, tầng ${loc.floor}`) || ['Không xác định'] } : { name: 'Không xác định', location: ['Không xác định'] },
+      room: m.room ? populateBuildingInRoom(m.room) : null,
     }));
     if (!hasFilters) await redisService.setDevicePage('monitor', page, limit, populatedMonitors, totalItems, 300);
     const totalPages = Math.ceil(totalItems / limit);
@@ -98,21 +99,27 @@ exports.getMonitorById = async (req, res) => {
     const { id } = req.params;
     const monitor = await Monitor.findById(id)
       .populate('assigned', 'fullname email jobTitle avatarUrl department')
-      .populate('room', 'name location status')
+      .populate('room', ROOM_POPULATE_FIELDS)
       .populate('assignmentHistory.user', 'fullname email jobTitle avatarUrl')
       .populate('assignmentHistory.assignedBy', 'fullname email jobTitle avatarUrl')
       .populate('assignmentHistory.revokedBy', 'fullname email jobTitle avatarUrl');
     if (!monitor) return res.status(404).send({ message: 'Không tìm thấy monitor' });
-    
+
     console.log('🔍 [DEBUG] getMonitorById - before ensureFullnameInHistory:');
     console.log('  assignmentHistory[0]:', JSON.stringify(monitor.assignmentHistory?.[0], null, 2));
-    
+
     ensureFullnameInHistory(monitor);
-    
+
     console.log('🔍 [DEBUG] getMonitorById - after ensureFullnameInHistory:');
     console.log('  assignmentHistory[0]:', JSON.stringify(monitor.assignmentHistory?.[0], null, 2));
-    
-    res.status(200).json(monitor);
+
+    // Transform room data to include building object
+    const transformedMonitor = {
+      ...monitor.toObject(),
+      room: monitor.room ? populateBuildingInRoom(monitor.room) : null
+    };
+
+    res.status(200).json(transformedMonitor);
   } catch (error) {
     res.status(500).send({ message: 'Lỗi máy chủ', error });
   }

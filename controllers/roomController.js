@@ -1,5 +1,6 @@
 const axios = require('axios');
 const Room = require('../models/Room');
+const { populateBuildingInRoom } = require('../utils/roomHelper');
 
 const FRAPPE_API_URL = process.env.FRAPPE_API_URL || 'https://admin.sis.wellspring.edu.vn';
 
@@ -425,7 +426,147 @@ exports.syncRoomById = async (req, res) => {
   }
 };
 
-// ✅ ENDPOINT 4: Webhook - Room changed in Frappe
+// ✅ ENDPOINT 4: Get all rooms with full information for frontend
+exports.getAllRooms = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 20,
+      search,
+      building,
+      campus_id,
+      room_type,
+      status = 'Active'
+    } = req.query;
+
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Build query
+    const query = { disabled: { $ne: true } }; // Exclude disabled rooms
+
+    if (status && status !== 'all') {
+      query.status = status;
+    }
+
+    if (building) {
+      query.building = building;
+    }
+
+    if (campus_id) {
+      query.campus_id = campus_id;
+    }
+
+    if (room_type) {
+      query.room_type = room_type;
+    }
+
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { room_name: { $regex: search, $options: 'i' } },
+        { room_name_en: { $regex: search, $options: 'i' } },
+        { short_title: { $regex: search, $options: 'i' } },
+        { building_name: { $regex: search, $options: 'i' } },
+        { building_name_vn: { $regex: search, $options: 'i' } },
+        { building_name_en: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Get total count for pagination
+    const totalItems = await Room.countDocuments(query);
+
+    // Get rooms with sorting
+    const rooms = await Room.find(query)
+      .sort({ building_name: 1, room_name: 1 })
+      .skip(skip)
+      .limit(limitNum)
+      .lean();
+
+    // Transform rooms to include building object
+    const transformedRooms = rooms.map(room => populateBuildingInRoom(room));
+
+    const totalPages = Math.ceil(totalItems / limitNum);
+
+    res.status(200).json({
+      success: true,
+      data: transformedRooms,
+      pagination: {
+        currentPage: pageNum,
+        totalPages,
+        totalItems,
+        itemsPerPage: limitNum,
+        hasNext: pageNum < totalPages,
+        hasPrev: pageNum > 1
+      },
+      meta: {
+        total_count: totalItems,
+        filters: {
+          search: search || null,
+          building: building || null,
+          campus_id: campus_id || null,
+          room_type: room_type || null,
+          status: status || 'Active'
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ [Get Rooms] Error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy danh sách phòng',
+      error: error.message
+    });
+  }
+};
+
+// ✅ ENDPOINT 5: Get room by Frappe ID
+exports.getRoomById = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+
+    if (!roomId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Room ID is required'
+      });
+    }
+
+    const room = await Room.findOne({
+      $or: [
+        { frappeRoomId: roomId },
+        { _id: roomId }
+      ]
+    }).lean();
+
+    if (!room) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy phòng'
+      });
+    }
+
+    // Transform room to include building object
+    const transformedRoom = populateBuildingInRoom(room);
+
+    res.status(200).json({
+      success: true,
+      data: transformedRoom
+    });
+
+  } catch (error) {
+    console.error('❌ [Get Room by ID] Error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy thông tin phòng',
+      error: error.message
+    });
+  }
+};
+
+// ✅ ENDPOINT 6: Webhook - Room changed in Frappe
 exports.webhookRoomChanged = async (req, res) => {
   try {
     const { doc, event } = req.body;
