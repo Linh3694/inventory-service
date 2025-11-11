@@ -547,7 +547,7 @@ exports.getRoomById = async (req, res) => {
 
     // Only add ObjectId query if the roomId is a valid MongoDB ObjectId
     if (mongoose.Types.ObjectId.isValid(roomId)) {
-      query.$or.push({ _id: mongoose.Types.ObjectId(roomId) }); // Search by MongoDB _id
+      query.$or.push({ _id: new mongoose.Types.ObjectId(roomId) }); // Search by MongoDB _id
     }
 
     console.log(`   📋 Query:`, JSON.stringify(query));

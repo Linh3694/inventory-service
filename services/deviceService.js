@@ -48,7 +48,7 @@ class DeviceService {
       
       if (mongoose.Types.ObjectId.isValid(roomId)) {
         // Valid ObjectId - search by _id reference
-        const objectId = mongoose.Types.ObjectId(roomId);
+        const objectId = new mongoose.Types.ObjectId(roomId);
         console.log(`   🔎 Searching as MongoDB ObjectId: ${objectId}`);
         query.room = objectId;
       } else {
@@ -113,7 +113,7 @@ class DeviceService {
       
       if (mongoose.Types.ObjectId.isValid(roomId)) {
         // Valid ObjectId
-        query.room = mongoose.Types.ObjectId(roomId);
+        query.room = new mongoose.Types.ObjectId(roomId);
       } else {
         // String format - search by multiple fields
         query.$or = [
