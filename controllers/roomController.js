@@ -538,6 +538,7 @@ exports.getRoomById = async (req, res) => {
 
     console.log(`🔍 [Get Room by ID] Searching for room: ${roomId}`);
 
+    // Build query - support multiple roomId formats
     const query = {
       $or: [
         { frappeRoomId: roomId },        // Search by Frappe Room ID (e.g., "ROOM-3264533")
@@ -550,12 +551,10 @@ exports.getRoomById = async (req, res) => {
       query.$or.push({ _id: new mongoose.Types.ObjectId(roomId) }); // Search by MongoDB _id
     }
 
-    console.log(`   📋 Query:`, JSON.stringify(query));
-
     const room = await Room.findOne(query).lean();
 
     if (!room) {
-      console.log(`   ❌ Room not found`);
+      console.log(`   ❌ Room not found for: ${roomId}`);
       return res.status(404).json({
         success: false,
         message: 'Không tìm thấy phòng'
