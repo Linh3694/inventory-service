@@ -386,7 +386,7 @@ exports.searchLaptops = async (req, res) => {
     const searchQuery = { $or: [ { name: { $regex: query, $options: 'i' } }, { serial: { $regex: query, $options: 'i' } }, { 'assigned.fullname': { $regex: query, $options: 'i' } } ] };
     const laptops = await Laptop.find(searchQuery)
       .populate('assigned', 'fullname jobTitle department avatarUrl')
-      .populate('room', 'name room_number building floor block status building_name building_name_vn building_name_en building_short_title campus_id short_title frappeRoomId')
+      .populate('room', ROOM_POPULATE_FIELDS)
       .lean();
 
     // Transform room data to include building object
@@ -417,7 +417,7 @@ exports.getLaptopById = async (req, res) => {
   try {
     const laptop = await Laptop.findById(id)
       .populate('assigned', 'fullname email jobTitle avatarUrl department')
-      .populate('room', 'name room_number building floor block status building_name building_name_vn building_name_en building_short_title campus_id short_title frappeRoomId')
+      .populate('room', ROOM_POPULATE_FIELDS)
       .populate('assignmentHistory.user', 'fullname email jobTitle avatarUrl')
       .populate('assignmentHistory.assignedBy', 'fullname email jobTitle avatarUrl')
       .populate('assignmentHistory.revokedBy', 'fullname email jobTitle avatarUrl');

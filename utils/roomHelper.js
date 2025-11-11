@@ -16,8 +16,8 @@ const populateBuildingInRoom = (room) => {
   };
 };
 
-// Common populate fields for room with building information
-const ROOM_POPULATE_FIELDS = 'name room_number building floor block status building_name building_name_vn building_name_en building_short_title campus_id short_title frappeRoomId';
+// Common populate fields for room with building information (MUST include _id for frontend reference)
+const ROOM_POPULATE_FIELDS = '_id name room_number building floor block status building_name building_name_vn building_name_en building_short_title campus_id short_title frappeRoomId';
 
 module.exports = {
   populateBuildingInRoom,
