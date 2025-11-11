@@ -21,7 +21,7 @@ class DeviceService {
 
   /**
    * Lấy tất cả thiết bị của một phòng
-   * @param {string} roomId - MongoDB ObjectId hoặc string ID của phòng
+   * @param {string} roomId - MongoDB ObjectId hoặc string ID hoặc room name
    * @param {Object} options - Query options
    * @returns {Promise<Array>} Mảng thiết bị
    */
@@ -37,10 +37,28 @@ class DeviceService {
 
       console.log(`🔍 [DeviceService] Fetching devices for room: ${roomId}`);
 
+      // Build query - support both MongoDB ObjectId and string room name/ID
+      const mongoose = require('mongoose');
+      const query = {};
+      
+      // Try to match both by ObjectId (if valid) and by string name
+      if (mongoose.Types.ObjectId.isValid(roomId)) {
+        // If it's a valid ObjectId, search by _id
+        query.$or = [
+          { room: mongoose.Types.ObjectId(roomId) },
+          { room: roomId } // Also support string matching for flexibility
+        ];
+      } else {
+        // If not an ObjectId, just search by string
+        query.room = roomId;
+      }
+
+      console.log(`   📋 Query:`, JSON.stringify(query));
+
       // Query tất cả collections
       for (const [type, Model] of Object.entries(this.DEVICE_MODELS)) {
         try {
-          const items = await Model.find({ room: roomId })
+          const items = await Model.find(query)
             .skip(skip)
             .limit(limit)
             .sort(sort)
@@ -73,16 +91,29 @@ class DeviceService {
 
   /**
    * Lấy số lượng thiết bị của phòng
-   * @param {string} roomId - MongoDB ObjectId của phòng
+   * @param {string} roomId - MongoDB ObjectId hoặc room name/ID
    * @returns {Promise<number>} Số lượng thiết bị
    */
   static async getDeviceCountByRoom(roomId) {
     try {
       let totalCount = 0;
 
+      // Build query - support both MongoDB ObjectId and string room name/ID
+      const mongoose = require('mongoose');
+      const query = {};
+      
+      if (mongoose.Types.ObjectId.isValid(roomId)) {
+        query.$or = [
+          { room: mongoose.Types.ObjectId(roomId) },
+          { room: roomId }
+        ];
+      } else {
+        query.room = roomId;
+      }
+
       for (const [type, Model] of Object.entries(this.DEVICE_MODELS)) {
         try {
-          const count = await Model.countDocuments({ room: roomId });
+          const count = await Model.countDocuments(query);
           if (count > 0) {
             console.log(`   ✅ ${type}: ${count} device(s)`);
             totalCount += count;

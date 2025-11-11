@@ -656,22 +656,14 @@ exports.getDevicesInRoom = async (req, res) => {
       });
     }
 
-    // Validate ObjectId format
-    if (!mongoose.Types.ObjectId.isValid(roomId)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid roomId format'
-      });
-    }
-
     console.log(`🔍 [Room Devices] Fetching devices for room: ${roomId}`);
 
-    // Fetch devices using DeviceService
+    // Fetch devices using DeviceService (accepts both ObjectId and string room names)
     const devices = await DeviceService.getDevicesByRoom(
       roomId,
       {
-        skip: parseInt(skip),
-        limit: parseInt(limit)
+        skip: parseInt(skip) || 0,
+        limit: parseInt(limit) || 100
       }
     );
 
@@ -684,8 +676,8 @@ exports.getDevicesInRoom = async (req, res) => {
       success: true,
       data: devices,
       pagination: {
-        skip: parseInt(skip),
-        limit: parseInt(limit),
+        skip: parseInt(skip) || 0,
+        limit: parseInt(limit) || 100,
         total: totalCount,
         hasMore: (parseInt(skip) + parseInt(limit)) < totalCount
       },
