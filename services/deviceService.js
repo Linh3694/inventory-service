@@ -37,23 +37,32 @@ class DeviceService {
 
       console.log(`🔍 [DeviceService] Fetching devices for room: ${roomId}`);
 
-      // Build query - support both MongoDB ObjectId and string room name/ID
+      // Build query - support multiple formats for roomId
       const mongoose = require('mongoose');
       const query = {};
       
-      // Try to match both by ObjectId (if valid) and by string name
+      // Support different roomId formats:
+      // 1. MongoDB ObjectId (24-char hex string or actual ObjectId)
+      // 2. Room name string (e.g., "Phòng Nhân Sự - Đào Tạo")
+      // 3. Frappe Room ID (e.g., "ROOM-3264533")
+      
       if (mongoose.Types.ObjectId.isValid(roomId)) {
-        // If it's a valid ObjectId, search by _id
-        query.$or = [
-          { room: mongoose.Types.ObjectId(roomId) },
-          { room: roomId } // Also support string matching for flexibility
-        ];
+        // Valid ObjectId - search by _id reference
+        const objectId = mongoose.Types.ObjectId(roomId);
+        console.log(`   🔎 Searching as MongoDB ObjectId: ${objectId}`);
+        query.room = objectId;
       } else {
-        // If not an ObjectId, just search by string
-        query.room = roomId;
+        // String format - search by room name, frappeRoomId, or exact string match
+        console.log(`   🔎 Searching as string/name: "${roomId}"`);
+        query.$or = [
+          { room: roomId },                    // Direct string match (if room is stored as string)
+          { 'room.name': roomId },             // Match room's name field if populated
+          { 'room.frappeRoomId': roomId },     // Match Frappe Room ID if populated
+          { 'room._id': roomId }               // Match room's _id if it's somehow a string
+        ];
       }
 
-      console.log(`   📋 Query:`, JSON.stringify(query));
+      console.log(`   📋 Query:`, JSON.stringify(query, null, 2));
 
       // Query tất cả collections
       for (const [type, Model] of Object.entries(this.DEVICE_MODELS)) {
@@ -98,17 +107,21 @@ class DeviceService {
     try {
       let totalCount = 0;
 
-      // Build query - support both MongoDB ObjectId and string room name/ID
+      // Build query - support multiple formats
       const mongoose = require('mongoose');
       const query = {};
       
       if (mongoose.Types.ObjectId.isValid(roomId)) {
-        query.$or = [
-          { room: mongoose.Types.ObjectId(roomId) },
-          { room: roomId }
-        ];
+        // Valid ObjectId
+        query.room = mongoose.Types.ObjectId(roomId);
       } else {
-        query.room = roomId;
+        // String format - search by multiple fields
+        query.$or = [
+          { room: roomId },                    // Direct string match
+          { 'room.name': roomId },             // Match room's name field if populated
+          { 'room.frappeRoomId': roomId },     // Match Frappe Room ID if populated
+          { 'room._id': roomId }               // Match room's _id if it's a string
+        ];
       }
 
       for (const [type, Model] of Object.entries(this.DEVICE_MODELS)) {
