@@ -524,7 +524,7 @@ exports.getAllRooms = async (req, res) => {
   }
 };
 
-// ✅ ENDPOINT 5: Get room by Frappe ID
+// ✅ ENDPOINT 5: Get room by Frappe ID or MongoDB ObjectId
 exports.getRoomById = async (req, res) => {
   try {
     const { roomId } = req.params;
@@ -536,19 +536,33 @@ exports.getRoomById = async (req, res) => {
       });
     }
 
-    const room = await Room.findOne({
+    console.log(`🔍 [Get Room by ID] Searching for room: ${roomId}`);
+
+    const query = {
       $or: [
-        { frappeRoomId: roomId },
-        { _id: roomId }
+        { frappeRoomId: roomId },        // Search by Frappe Room ID (e.g., "ROOM-3264533")
+        { name: roomId },                 // Search by room name
       ]
-    }).lean();
+    };
+
+    // Only add ObjectId query if the roomId is a valid MongoDB ObjectId
+    if (mongoose.Types.ObjectId.isValid(roomId)) {
+      query.$or.push({ _id: mongoose.Types.ObjectId(roomId) }); // Search by MongoDB _id
+    }
+
+    console.log(`   📋 Query:`, JSON.stringify(query));
+
+    const room = await Room.findOne(query).lean();
 
     if (!room) {
+      console.log(`   ❌ Room not found`);
       return res.status(404).json({
         success: false,
         message: 'Không tìm thấy phòng'
       });
     }
+
+    console.log(`   ✅ Found room: ${room._id}`);
 
     // Transform room to include building object
     const transformedRoom = populateBuildingInRoom(room);
