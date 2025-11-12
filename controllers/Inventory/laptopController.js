@@ -8,6 +8,7 @@ const redisService = require('../../services/redisService');
 const { resolveRoomId } = require('../../utils/roomResolver');
 const { ensureFullnameInHistory } = require('../../utils/assignmentHelper');
 const { populateBuildingInRoom, ROOM_POPULATE_FIELDS } = require('../../utils/roomHelper');
+const { logDeviceCreated, logDeviceUpdated, logDeviceDeleted, logDeviceHandover, logDeviceRevoked, logAPICall, logError, logCacheOperation } = require('../../utils/logger');
 
 // Copy logic từ backend, giữ nguyên hành vi
 // Lấy danh sách laptop với pagination và cache
@@ -111,6 +112,16 @@ exports.createLaptop = async (req, res) => {
     if (assigned && assigned.length > 0 && validStatus === 'Standby') validStatus = 'PendingDocumentation';
     const laptop = new Laptop({ name, manufacturer, serial, assigned, specs, type, room, reason: validStatus === 'Broken' ? reason : undefined, status: validStatus });
     await laptop.save();
+    
+    // Log device creation
+    try {
+      const userEmail = req.user?.email || 'unknown';
+      const userName = req.user?.fullname || req.user?.email || 'unknown';
+      logDeviceCreated(userEmail, userName, laptop._id.toString(), 'Laptop', name, serial);
+    } catch (logErr) {
+      console.warn('⚠️  Failed to log device creation:', logErr.message);
+    }
+    
     await redisService.deleteDeviceCache('laptop');
     res.status(201).json(laptop);
   } catch (error) {
@@ -187,6 +198,15 @@ exports.updateLaptop = async (req, res) => {
     
     if (!laptop) return res.status(404).json({ message: 'Không tìm thấy laptop' });
 
+    // Log device update
+    try {
+      const userEmail = req.user?.email || 'unknown';
+      const userName = req.user?.fullname || req.user?.email || 'unknown';
+      logDeviceUpdated(userEmail, userName, id, 'Laptop', updatedData);
+    } catch (logErr) {
+      console.warn('⚠️  Failed to log device update:', logErr.message);
+    }
+
     await redisService.deleteDeviceCache('laptop');
 
     // Transform room data to include building object
@@ -204,7 +224,22 @@ exports.updateLaptop = async (req, res) => {
 
 exports.deleteLaptop = async (req, res) => {
   try {
+    const laptop = await Laptop.findById(req.params.id);
+    if (!laptop) return res.status(404).json({ message: 'Không tìm thấy laptop' });
+    
+    const device_name = laptop.name;
+    
     await Laptop.findByIdAndDelete(req.params.id);
+    
+    // Log device deletion
+    try {
+      const userEmail = req.user?.email || 'unknown';
+      const userName = req.user?.fullname || req.user?.email || 'unknown';
+      logDeviceDeleted(userEmail, userName, req.params.id, 'Laptop', device_name);
+    } catch (logErr) {
+      console.warn('⚠️  Failed to log device deletion:', logErr.message);
+    }
+    
     await redisService.deleteDeviceCache('laptop');
     res.json({ message: 'Laptop deleted' });
   } catch (error) {
@@ -246,6 +281,19 @@ exports.assignLaptop = async (req, res) => {
     laptop.assigned = [newUser._id];
     laptop.status = 'PendingDocumentation';
     await laptop.save();
+
+    // Log device handover
+    try {
+      const userEmail = req.user?.email || 'unknown';
+      const userName = req.user?.fullname || req.user?.email || 'unknown';
+      const oldUserName = laptop.assigned?.length > 0 ? laptop.assigned[0].fullname : 'không ai';
+      const newUserName = newUser.fullname || 'unknown';
+      const room_id = laptop.room?.toString() || '';
+      logDeviceHandover(userEmail, userName, id, 'Laptop', oldUserName, newUserName, room_id);
+    } catch (logErr) {
+      console.warn('⚠️  Failed to log device handover:', logErr.message);
+    }
+
     await redisService.deleteDeviceCache('laptop');
     const populated = await laptop.populate({ path: 'assignmentHistory.user', select: 'fullname jobTitle avatarUrl department' });
     res.status(200).json(populated);
@@ -279,9 +327,20 @@ exports.revokeLaptop = async (req, res) => {
       });
     }
     laptop.status = status || 'Standby';
+    const oldUserName = laptop.assigned?.length > 0 ? laptop.assigned[0].fullname : 'không ai';
     laptop.currentHolder = null;
     laptop.assigned = [];
     await laptop.save();
+
+    // Log device revocation
+    try {
+      const userEmail = req.user?.email || 'unknown';
+      const userName = req.user?.fullname || req.user?.email || 'unknown';
+      logDeviceRevoked(userEmail, userName, id, 'Laptop', oldUserName);
+    } catch (logErr) {
+      console.warn('⚠️  Failed to log device revocation:', logErr.message);
+    }
+
     await redisService.deleteDeviceCache('laptop');
     res.status(200).json({ message: 'Thu hồi thành công', laptop });
   } catch (error) {
