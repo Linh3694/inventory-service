@@ -25,14 +25,41 @@ app.use(morgan('dev'));
 // Static files for uploads
 app.use('/uploads', express.static(require('path').join(__dirname, 'uploads')));
 
-// Simple health route
+// Simple health route with Redis status
 app.get('/health', async (req, res) => {
-  res.json({
+  const healthStatus = {
     service: 'inventory-service',
     env: process.env.NODE_ENV,
     mongo_connected: db.isConnected(),
-    timestamp: new Date().toISOString(),
-  });
+    timestamp: new Date().toISOString()
+  };
+
+  // Check Redis (optional service)
+  try {
+    if (redis.isRedisAvailable() && redis.client) {
+      await redis.client.ping();
+      healthStatus.redis = 'connected';
+    } else {
+      healthStatus.redis = 'unavailable';
+      healthStatus.redis_note = 'Redis is optional, service continues to work without caching';
+    }
+  } catch (error) {
+    healthStatus.redis = 'unavailable';
+    healthStatus.redis_note = 'Redis is optional, service continues to work without caching';
+    healthStatus.redis_error = error.message;
+  }
+
+  // Determine overall status - only MongoDB is critical
+  if (!db.isConnected()) {
+    healthStatus.status = 'error';
+    res.status(503).json(healthStatus);
+  } else if (healthStatus.redis === 'unavailable') {
+    healthStatus.status = 'degraded';
+    res.status(200).json(healthStatus); // Redis unavailable is not a critical error
+  } else {
+    healthStatus.status = 'ok';
+    res.status(200).json(healthStatus);
+  }
 });
 
 // Inventory routes (protected by user auth or service-to-service token at router level)
@@ -56,7 +83,13 @@ app.get('/api/inventory/room-devices', authenticate, roomController.getDevicesIn
 async function start() {
   const port = Number(process.env.PORT || 4010);
   await db.connect();
-  await redis.connect();
+
+  // Connect to Redis (optional - service continues if Redis fails)
+  try {
+    await redis.connect();
+  } catch (error) {
+    console.warn('⚠️ [Inventory Service] Redis connection failed during startup, continuing without Redis');
+  }
 
   async function syncUserDenormalizedData(userDoc) {
     try {
@@ -84,15 +117,15 @@ async function start() {
     }
   }
 
-  // Subscribe to user events from primary Redis
+  // Subscribe to user events from primary Redis (only if Redis is available)
   const userChannel = process.env.REDIS_USER_CHANNEL || 'user_events';
-  console.log(`[Inventory Service] Subscribing to Redis channel: ${userChannel}`);
-
-  // Subscribe to room events from primary Redis
   const roomChannel = process.env.REDIS_ROOM_CHANNEL || 'room_events';
-  console.log(`[Inventory Service] Subscribing to Redis room channel: ${roomChannel}`);
 
-  await redis.subscribe(userChannel, async (message) => {
+  if (redis.isRedisAvailable()) {
+    console.log(`[Inventory Service] Subscribing to Redis channel: ${userChannel}`);
+    console.log(`[Inventory Service] Subscribing to Redis room channel: ${roomChannel}`);
+
+    await redis.subscribe(userChannel, async (message) => {
     try {
       // Always log user events for debugging
       console.log('[Inventory Service] User event received:', message?.type, 'from:', message?.source);
@@ -130,11 +163,11 @@ async function start() {
       }
     } catch (err) {
       console.error('[Inventory Service] Failed handling user event:', err.message);
-    }
-  });
+      }
+    });
 
-  // Subscribe to room events
-  await redis.subscribe(roomChannel, async (message) => {
+    // Subscribe to room events
+    await redis.subscribe(roomChannel, async (message) => {
     try {
       console.log('[Inventory Service] Room event received:', message?.type, 'from:', message?.source);
       if (!message || typeof message !== 'object' || !message.type) return;
@@ -192,6 +225,9 @@ async function start() {
       console.error('[Inventory Service] (secondary) Failed handling user event:', err.message);
     }
   }, true);
+  } else {
+    console.log('[Inventory Service] Redis not available, skipping Redis subscriptions');
+  }
 
   app.listen(port, () => {
     console.log(`🚀 inventory-service listening on port ${port}`);
