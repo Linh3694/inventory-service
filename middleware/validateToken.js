@@ -1,202 +1,140 @@
 const jwt = require('jsonwebtoken');
-const axios = require('axios');
 const User = require('../models/User');
-
-// Frappe API configuration
-const FRAPPE_API_URL = process.env.FRAPPE_API_URL || 'https://admin.sis.wellspring.edu.vn';
+const frappeService = require('../services/frappeService');
 
 // Helper: trích xuất userId linh hoạt từ token (tương thích đa nguồn)
 function getUserIdFromDecoded(decoded) {
   return decoded?.id || decoded?.userId || decoded?.user || decoded?.name || decoded?.email || decoded?.sub || null;
 }
 
-// Try validating token via Frappe first, then fallback to JWT
+// Verify token using frappeService
 async function resolveFrappeUserByToken(token) {
   try {
-    const erpResp = await axios.get(
-      `${FRAPPE_API_URL}/api/method/erp.api.erp_common_user.auth.get_current_user`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'X-Frappe-CSRF-Token': token,
-        },
-        timeout: 10000,
-      }
-    );
-    if (erpResp.data?.status === 'success' && erpResp.data.user) {
-      return erpResp.data.user;
-    }
-  } catch (e) {
-    console.warn('⚠️ [Auth] ERP endpoint failed:', e.message);
-    // Fallback to Frappe default
-    try {
-      const loggedResp = await axios.get(
-        `${FRAPPE_API_URL}/api/method/frappe.auth.get_logged_user`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'X-Frappe-CSRF-Token': token,
-          },
-          timeout: 10000,
-        }
-      );
-
-      if (loggedResp.data?.message) {
-        const userResp = await axios.get(
-          `${FRAPPE_API_URL}/api/resource/User/${loggedResp.data.message}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'X-Frappe-CSRF-Token': token,
-            },
-            timeout: 10000,
-          }
-        );
-        return userResp.data?.data || null;
-      }
-    } catch (fallbackErr) {
-      console.warn('⚠️ [Auth] Frappe default endpoint also failed:', fallbackErr.message);
-      // Will continue to JWT validation
-    }
+    const userInfo = await frappeService.verifyTokenAndGetUser(token);
+    return userInfo;
+  } catch (error) {
+    console.warn('⚠️ [Auth] Frappe service verification failed:', error.message);
+    return null;
   }
-  return null;
 }
 
-// Bắt buộc xác thực - try Frappe first, fallback to JWT
+// Authentication using frappeService (similar to ticket-service)
 const authenticate = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+
+    if (!token) {
       return res.status(401).json({
         success: false,
-        message: 'Authorization header missing or invalid',
-        code: 'MISSING_TOKEN'
+        message: 'Access denied. No token provided.'
       });
     }
 
-    const token = authHeader.split(' ')[1];
-
-    // 1. Try Frappe authentication first
-    let frappeUser = null;
+    let userInfo;
     try {
-      frappeUser = await resolveFrappeUserByToken(token);
-      if (frappeUser) {
-        console.log('✅ [Auth] Frappe authentication successful for:', frappeUser.email || frappeUser.name);
-      }
-    } catch (e) {
-      console.warn('⚠️ [Auth] Frappe authentication failed:', e.message);
-      // Continue to JWT validation
+      console.log('🔍 [Auth] Verifying token with Frappe API...');
+      userInfo = await frappeService.verifyTokenAndGetUser(token);
+      console.log('✅ [Auth] Token verified with Frappe for user:', userInfo?.email);
+    } catch (frappeError) {
+      console.warn('⚠️ [Auth] Frappe API verification failed:', frappeError.message);
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid or expired token.'
+      });
     }
 
-    if (frappeUser) {
-      // Map Frappe user to req.user format and get MongoDB ObjectId
-      try {
-        const mongoUser = await User.updateFromFrappe(frappeUser);
-        req.user = {
-          _id: mongoUser._id, // MongoDB ObjectId object
-          id: mongoUser._id.toString(),
-          name: frappeUser.name || frappeUser.email,
-          fullname: frappeUser.full_name || frappeUser.fullname || frappeUser.name,
-          email: frappeUser.email,
-          role: frappeUser.role || frappeUser.user_role || 'user',
-          roles: frappeUser.frappe_roles || [frappeUser.role] || ['user'],
-          employeeCode: frappeUser.employee_code || null,
-          department: frappeUser.department || null,
-          jobTitle: frappeUser.job_title || null,
-          frappeUserId: frappeUser.name || frappeUser.email,
-          token,
-          provider: 'frappe'
-        };
-        return next();
-      } catch (mongoError) {
-        console.error('❌ [Auth] Failed to sync Frappe user to MongoDB:', mongoError.message);
-        return res.status(500).json({ success: false, message: 'Failed to process user', code: 'USER_SYNC_FAILED' });
-      }
+    // Validate user info
+    if (!userInfo || !userInfo.email) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid token: missing user information.'
+      });
     }
 
-    // 2. Fallback to JWT validation for backward compatibility
-    const secret = process.env.JWT_SECRET || 'breakpoint';
-    try {
-      // Check if token looks like a JWT (has 3 parts separated by dots)
-      const isJWTFormat = token.split('.').length === 3;
-      if (!isJWTFormat) {
-        console.warn('⚠️ [Auth] Token does not appear to be JWT format, skipping JWT validation');
-        return res.status(401).json({ 
-          success: false, 
-          message: 'Frappe authentication failed and token is not a valid JWT', 
-          code: 'AUTH_FAILED' 
-        });
-      }
-
-      const decoded = jwt.verify(token, secret);
-      const userId = getUserIdFromDecoded(decoded);
-      if (!userId) {
-        console.warn('⚠️ [Auth] JWT decoded but no userId found. Decoded keys:', Object.keys(decoded));
-        return res.status(401).json({ success: false, message: 'Invalid token structure', code: 'INVALID_TOKEN' });
-      }
-
-      console.log('✅ [Auth] JWT authentication successful for:', userId);
-
-      // Map JWT decoded to req.user format and get/create MongoDB ObjectId
-      try {
-        const email = decoded.email || decoded.user || userId;
-        
-        // Extract fullname from JWT (if available)
-        const jwtFullname = decoded.fullname || decoded.fullName || decoded.full_name || decoded.name || null;
-        
-        // Build update object - only update fullname if it has a value
-        const updateFields = {
-          email,
-          name: decoded.name || userId,
-          role: decoded.role || null,
-          roles: decoded.roles || [],
-          frappeUserId: userId
-        };
-        
-        // Only update fullname if JWT provides a valid value (don't overwrite with null)
-        if (jwtFullname) {
-          updateFields.fullname = jwtFullname;
-        }
-        
-        const mongoUser = await User.findOneAndUpdate(
-          { email },
-          updateFields,
-          { upsert: true, new: true, setDefaultsOnInsert: true }
-        );
-
-        req.user = {
-          _id: mongoUser._id, // MongoDB ObjectId object
-          id: mongoUser._id.toString(),
-          name: decoded.name || userId,
-          fullname: decoded.fullname || decoded.fullName || decoded.full_name || decoded.name || null,
-          email: decoded.email || decoded.user || null,
-          role: decoded.role || null,
-          roles: decoded.roles || [],
-          employeeCode: decoded.employeeCode || null,
-          department: decoded.department || null,
-          jobTitle: decoded.jobTitle || decoded.designation || null,
-          frappeUserId: userId,
-          token,
-          provider: 'jwt'
-        };
-
-        return next();
-      } catch (mongoError) {
-        console.error('❌ [Auth] Failed to sync JWT user to MongoDB:', mongoError.message);
-        return res.status(500).json({ success: false, message: 'Failed to process user', code: 'USER_SYNC_FAILED' });
-      }
-    } catch (jwtError) {
-      if (jwtError.name === 'JsonWebTokenError') {
-        return res.status(401).json({ success: false, message: 'Invalid token', code: 'INVALID_TOKEN' });
-      }
-      if (jwtError.name === 'TokenExpiredError') {
-        return res.status(401).json({ success: false, message: 'Token expired', code: 'TOKEN_EXPIRED' });
-      }
-      return res.status(401).json({ success: false, message: 'Authentication failed', code: 'AUTH_FAILED' });
+    // Check if user is enabled
+    if (userInfo.enabled !== undefined && userInfo.enabled !== 1) {
+      return res.status(401).json({
+        success: false,
+        message: 'User account is disabled.'
+      });
     }
-  } catch (e) {
-    console.error('❌ [Inventory Service] Auth middleware error:', e.message);
-    return res.status(500).json({ success: false, message: 'Internal authentication error', code: 'AUTH_INTERNAL_ERROR' });
+
+    // 📦 Sync/Update user trong MongoDB
+    const frappeRoles = Array.isArray(userInfo.roles)
+      ? userInfo.roles.map(r => typeof r === 'string' ? r : r?.role).filter(Boolean)
+      : [];
+
+    // Get existing user để preserve fields
+    const existingUser = await User.findOne({ email: userInfo.email });
+
+    // Build update object - CHỈ update fields có giá trị (tránh ghi đè với empty)
+    const userData = {
+      email: userInfo.email,
+      fullname: userInfo.full_name || userInfo.fullname || userInfo.name,
+      provider: 'frappe',
+      disabled: userInfo.enabled !== 1,
+      active: userInfo.enabled === 1,
+      roles: frappeRoles,
+      role: frappeRoles.length > 0 ? frappeRoles[0].toLowerCase() : 'user',
+      updatedAt: new Date()
+    };
+
+    // Conditional updates - chỉ update nếu có giá trị mới
+    if (userInfo.user_image || userInfo.avatar) {
+      userData.avatarUrl = userInfo.user_image || userInfo.avatar;
+    } else if (!existingUser) {
+      userData.avatarUrl = '';  // Default for new users
+    }
+
+    if (userInfo.department) {
+      userData.department = userInfo.department;
+    } else if (!existingUser) {
+      userData.department = '';
+    }
+
+    if (userInfo.job_title || userInfo.designation) {
+      userData.jobTitle = userInfo.job_title || userInfo.designation;
+    } else if (!existingUser) {
+      userData.jobTitle = 'User';
+    }
+
+    if (userInfo.employee_code) {
+      userData.employeeCode = userInfo.employee_code;
+    }
+
+    let localUser = await User.findOneAndUpdate(
+      { email: userInfo.email },
+      userData,
+      {
+        upsert: true,
+        new: true,
+        setDefaultsOnInsert: true
+      }
+    );
+
+    console.log(`✅ [Auth] User synced: ${localUser.email} (roles: ${frappeRoles.join(', ')})`);
+
+    // ✅ Set authenticated user on request
+    req.user = {
+      _id: localUser._id,
+      fullname: localUser.fullname || userInfo.email,
+      email: localUser.email,
+      role: localUser.role || 'user',
+      avatarUrl: localUser.avatarUrl || '',
+      department: localUser.department || '',
+      roles: localUser.roles || frappeRoles || [],
+      isActive: !localUser.disabled
+    };
+
+    console.log(`🔐 [Auth] Request authenticated for: ${req.user.email}`);
+    next();
+
+  } catch (error) {
+    console.error('❌ [Auth] Authentication error:', error.message);
+    res.status(401).json({
+      success: false,
+      message: 'Authentication failed.'
+    });
   }
 };
 

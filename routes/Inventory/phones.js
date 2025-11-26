@@ -11,9 +11,12 @@ const {
   revokePhone,
   updatePhoneStatus,
   getPhoneStatistics,
+  uploadHandoverReport,
+  getHandoverReport,
 } = require('../../controllers/Inventory/phoneController');
 
 const { authenticateServiceOrUser, optionalAuth } = require('../../middleware/validateToken');
+const { upload, processFile } = require('../../middleware/uploadHandover');
 
 // Public GETs
 router.get('/', optionalAuth, getPhones);
@@ -23,6 +26,8 @@ router.get('/:id', optionalAuth, getPhoneById);
 // Protected writes
 router.use(authenticateServiceOrUser);
 router.post('/', createPhone);
+router.post('/upload', upload.single('file'), processFile, uploadHandoverReport);
+router.get('/handover/:filename', getHandoverReport);
 router.put('/:id', updatePhone);
 router.delete('/:id', deletePhone);
 router.put('/:id/specs', updatePhoneSpecs);
