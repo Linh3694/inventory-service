@@ -14,6 +14,7 @@ const {
   getProjectorById,
   updateProjectorSpecs,
   getProjectorStatistics,
+  getProjectorFilters,
 } = require('../../controllers/Inventory/projectorController');
 
 const { authenticateServiceOrUser, optionalAuth } = require('../../middleware/validateToken');
@@ -21,6 +22,7 @@ const { upload, processFile } = require('../../middleware/uploadHandover');
 
 // Public GETs
 router.get('/', optionalAuth, getProjectors);
+router.get('/filters', optionalAuth, getProjectorFilters);
 router.get('/statistics', optionalAuth, getProjectorStatistics);
 router.get('/:id', optionalAuth, getProjectorById);
 

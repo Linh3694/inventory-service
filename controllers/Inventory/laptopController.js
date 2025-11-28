@@ -547,6 +547,63 @@ exports.fixOldData = async (req, res) => {
   }
 };
 
+// Get laptop filter options
+exports.getLaptopFilters = async (req, res) => {
+  try {
+    // Get distinct statuses
+    const statuses = await Laptop.distinct('status');
+
+    // Get distinct types (for laptops, this might include 'laptop', 'desktop', 'macbook', etc.)
+    const types = await Laptop.distinct('type');
+
+    // Get distinct manufacturers
+    const manufacturers = await Laptop.distinct('manufacturer');
+
+    // Get distinct departments from assigned users
+    const departmentPipeline = [
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'assigned',
+          foreignField: '_id',
+          as: 'assignedUsers'
+        }
+      },
+      { $unwind: '$assignedUsers' },
+      { $group: { _id: '$assignedUsers.department' } },
+      { $match: { _id: { $ne: null, $exists: true } } }
+    ];
+    const departmentResults = await Laptop.aggregate(departmentPipeline);
+    const departments = departmentResults.map(result => result._id).filter(dept => dept);
+
+    // Get year range
+    const yearStats = await Laptop.aggregate([
+      {
+        $group: {
+          _id: null,
+          minYear: { $min: '$releaseYear' },
+          maxYear: { $max: '$releaseYear' }
+        }
+      }
+    ]);
+
+    const yearRange = yearStats.length > 0 && yearStats[0].minYear && yearStats[0].maxYear
+      ? [yearStats[0].minYear, yearStats[0].maxYear]
+      : [2015, 2024];
+
+    res.json({
+      statuses: statuses.filter(s => s), // Filter out null/undefined
+      types: types.filter(t => t), // Filter out null/undefined
+      manufacturers: manufacturers.filter(m => m), // Filter out null/undefined
+      departments: departments,
+      yearRange
+    });
+  } catch (error) {
+    console.error('Lỗi getLaptopFilters:', error);
+    res.status(500).json({ message: 'Đã xảy ra lỗi khi lấy filter options.', error });
+  }
+};
+
 // Get laptop statistics
 exports.getLaptopStatistics = async (req, res) => {
   try {

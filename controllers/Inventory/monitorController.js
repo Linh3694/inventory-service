@@ -369,6 +369,63 @@ exports.getHandoverReport = async (req, res) => {
   return getHandoverHelper(req, res);
 };
 
+// Get monitor filter options
+exports.getMonitorFilters = async (req, res) => {
+  try {
+    // Get distinct statuses
+    const statuses = await Monitor.distinct('status');
+
+    // Get distinct types
+    const types = await Monitor.distinct('type');
+
+    // Get distinct manufacturers
+    const manufacturers = await Monitor.distinct('manufacturer');
+
+    // Get distinct departments from assigned users
+    const departmentPipeline = [
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'assigned',
+          foreignField: '_id',
+          as: 'assignedUsers'
+        }
+      },
+      { $unwind: '$assignedUsers' },
+      { $group: { _id: '$assignedUsers.department' } },
+      { $match: { _id: { $ne: null, $exists: true } } }
+    ];
+    const departmentResults = await Monitor.aggregate(departmentPipeline);
+    const departments = departmentResults.map(result => result._id).filter(dept => dept);
+
+    // Get year range
+    const yearStats = await Monitor.aggregate([
+      {
+        $group: {
+          _id: null,
+          minYear: { $min: '$releaseYear' },
+          maxYear: { $max: '$releaseYear' }
+        }
+      }
+    ]);
+
+    const yearRange = yearStats.length > 0 && yearStats[0].minYear && yearStats[0].maxYear
+      ? [yearStats[0].minYear, yearStats[0].maxYear]
+      : [2015, 2024];
+
+    res.json({
+      statuses: statuses.filter(s => s),
+      types: types.filter(t => t),
+      manufacturers: manufacturers.filter(m => m),
+      departments: departments,
+      yearRange
+    });
+  } catch (error) {
+    console.error('Lỗi getMonitorFilters:', error);
+    res.status(500).json({ message: 'Đã xảy ra lỗi khi lấy filter options.', error });
+  }
+};
+
 // Get monitor statistics
 exports.getMonitorStatistics = async (req, res) => {
   try {

@@ -338,6 +338,63 @@ exports.getHandoverReport = async (req, res) => {
   return getHandoverHelper(req, res);
 };
 
+// Get phone filter options
+exports.getPhoneFilters = async (req, res) => {
+  try {
+    // Get distinct statuses
+    const statuses = await Phone.distinct('status');
+
+    // Get distinct types
+    const types = await Phone.distinct('type');
+
+    // Get distinct manufacturers
+    const manufacturers = await Phone.distinct('manufacturer');
+
+    // Get distinct departments from assigned users
+    const departmentPipeline = [
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'assigned',
+          foreignField: '_id',
+          as: 'assignedUsers'
+        }
+      },
+      { $unwind: '$assignedUsers' },
+      { $group: { _id: '$assignedUsers.department' } },
+      { $match: { _id: { $ne: null, $exists: true } } }
+    ];
+    const departmentResults = await Phone.aggregate(departmentPipeline);
+    const departments = departmentResults.map(result => result._id).filter(dept => dept);
+
+    // Get year range
+    const yearStats = await Phone.aggregate([
+      {
+        $group: {
+          _id: null,
+          minYear: { $min: '$releaseYear' },
+          maxYear: { $max: '$releaseYear' }
+        }
+      }
+    ]);
+
+    const yearRange = yearStats.length > 0 && yearStats[0].minYear && yearStats[0].maxYear
+      ? [yearStats[0].minYear, yearStats[0].maxYear]
+      : [2015, 2024];
+
+    res.json({
+      statuses: statuses.filter(s => s),
+      types: types.filter(t => t),
+      manufacturers: manufacturers.filter(m => m),
+      departments: departments,
+      yearRange
+    });
+  } catch (error) {
+    console.error('Lỗi getPhoneFilters:', error);
+    res.status(500).json({ message: 'Đã xảy ra lỗi khi lấy filter options.', error });
+  }
+};
+
 // Get phone statistics
 exports.getPhoneStatistics = async (req, res) => {
   try {

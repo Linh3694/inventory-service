@@ -15,6 +15,7 @@ const {
   updateLaptopSpecs,
   fixOldData,
   getLaptopStatistics,
+  getLaptopFilters,
 } = require('../../controllers/Inventory/laptopController');
 
 const { authenticate, authenticateServiceOrUser, optionalAuth } = require('../../middleware/validateToken');
@@ -22,6 +23,7 @@ const { upload, processFile } = require('../../middleware/uploadHandover');
 
 // Public/optional auth for GET endpoints
 router.get('/', optionalAuth, getLaptops);
+router.get('/filters', optionalAuth, getLaptopFilters);
 router.get('/statistics', optionalAuth, getLaptopStatistics);
 router.get('/:id', optionalAuth, getLaptopById);
 

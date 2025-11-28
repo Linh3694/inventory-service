@@ -14,6 +14,7 @@ const {
   uploadHandoverReport,
   getHandoverReport,
   getPrinterStatistics,
+  getPrinterFilters,
 } = require('../../controllers/Inventory/printerController');
 
 const { authenticateServiceOrUser, optionalAuth } = require('../../middleware/validateToken');
@@ -21,6 +22,7 @@ const { upload, processFile } = require('../../middleware/uploadHandover');
 
 // Public GETs
 router.get('/', optionalAuth, getPrinters);
+router.get('/filters', optionalAuth, getPrinterFilters);
 router.get('/statistics', optionalAuth, getPrinterStatistics);
 router.get('/:id', optionalAuth, getPrinterById);
 

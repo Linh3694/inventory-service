@@ -14,6 +14,7 @@ const {
   uploadHandoverReport,
   getHandoverReport,
   getMonitorStatistics,
+  getMonitorFilters,
 } = require('../../controllers/Inventory/monitorController');
 
 const { authenticateServiceOrUser, optionalAuth } = require('../../middleware/validateToken');
@@ -21,6 +22,7 @@ const { upload, processFile } = require('../../middleware/uploadHandover');
 
 // Public GETs
 router.get('/', optionalAuth, getMonitors);
+router.get('/filters', optionalAuth, getMonitorFilters);
 router.get('/statistics', optionalAuth, getMonitorStatistics);
 router.get('/:id', optionalAuth, getMonitorById);
 

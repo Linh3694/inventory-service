@@ -14,6 +14,7 @@ const {
   getToolById,
   updateToolSpecs,
   getToolStatistics,
+  getToolFilters,
 } = require('../../controllers/Inventory/toolController');
 
 const { authenticateServiceOrUser, optionalAuth } = require('../../middleware/validateToken');
@@ -21,6 +22,7 @@ const { upload, processFile } = require('../../middleware/uploadHandover');
 
 // Public GETs
 router.get('/', optionalAuth, getTools);
+router.get('/filters', optionalAuth, getToolFilters);
 router.get('/statistics', optionalAuth, getToolStatistics);
 router.get('/:id', optionalAuth, getToolById);
 

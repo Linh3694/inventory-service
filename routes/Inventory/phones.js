@@ -11,6 +11,7 @@ const {
   revokePhone,
   updatePhoneStatus,
   getPhoneStatistics,
+  getPhoneFilters,
   uploadHandoverReport,
   getHandoverReport,
 } = require('../../controllers/Inventory/phoneController');
@@ -20,6 +21,7 @@ const { upload, processFile } = require('../../middleware/uploadHandover');
 
 // Public GETs
 router.get('/', optionalAuth, getPhones);
+router.get('/filters', optionalAuth, getPhoneFilters);
 router.get('/statistics', optionalAuth, getPhoneStatistics);
 router.get('/:id', optionalAuth, getPhoneById);
 
