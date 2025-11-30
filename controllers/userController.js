@@ -378,3 +378,53 @@ exports.webhookUserChanged = async (req, res) => {
   }
 };
 
+// Get all users for device assignment
+exports.getAllUsers = async (req, res) => {
+  try {
+    const { search, department, limit = 100, page = 1 } = req.query;
+    
+    let query = {};
+    
+    // Search by name or email
+    if (search) {
+      query.$or = [
+        { fullname: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    // Filter by department
+    if (department) {
+      query.department = department;
+    }
+    
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    const users = await User.find(query)
+      .select('fullname email department jobTitle avatarUrl frappeUserId')
+      .sort({ fullname: 1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .lean();
+    
+    const total = await User.countDocuments(query);
+    
+    res.json({
+      users,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(total / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error getting users:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Không thể lấy danh sách người dùng',
+      error: error.message
+    });
+  }
+};
+

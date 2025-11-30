@@ -3,6 +3,9 @@ const userController = require('../controllers/userController');
 
 const router = express.Router();
 
+// 📋 GET all users for assignment (with optional search/filter)
+router.get('/', userController.getAllUsers);
+
 // 📝 ENDPOINT 1: Manual sync all users (UNAUTHENTICATED - secured via token in Frappe)
 router.post('/sync/manual', userController.syncUsersManual);
 
