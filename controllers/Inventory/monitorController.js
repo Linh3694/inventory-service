@@ -39,9 +39,27 @@ exports.getMonitors = async (req, res) => {
         { manufacturer: { $regex: search, $options: 'i' } },
       ];
     }
-    if (status) query.status = status;
-    if (manufacturer) query.manufacturer = { $regex: manufacturer, $options: 'i' };
-    if (type) query.type = { $regex: type, $options: 'i' };
+    // Support both single value and comma-separated multiple values
+    if (status) {
+      const statusValues = status.includes(',') ? status.split(',').map(s => s.trim()) : [status];
+      query.status = statusValues.length === 1 ? statusValues[0] : { $in: statusValues };
+    }
+    if (manufacturer) {
+      const manuValues = manufacturer.includes(',') ? manufacturer.split(',').map(m => m.trim()) : [manufacturer];
+      if (manuValues.length === 1) {
+        query.manufacturer = { $regex: manuValues[0], $options: 'i' };
+      } else {
+        query.manufacturer = { $in: manuValues.map(m => new RegExp(m, 'i')) };
+      }
+    }
+    if (type) {
+      const typeValues = type.includes(',') ? type.split(',').map(t => t.trim()) : [type];
+      if (typeValues.length === 1) {
+        query.type = { $regex: typeValues[0], $options: 'i' };
+      } else {
+        query.type = { $in: typeValues.map(t => new RegExp(t, 'i')) };
+      }
+    }
     if (releaseYear) query.releaseYear = parseInt(releaseYear);
     let monitors, totalItems;
     if (search) {
@@ -63,8 +81,6 @@ exports.getMonitors = async (req, res) => {
         .populate('assignmentHistory.revokedBy', 'fullname email')
         .lean();
       monitors = ensureFullnameInHistory(populated);
-      console.log('🔍 [DEBUG] getMonitors - search path, after ensureFullnameInHistory:');
-      console.log('  First monitor:', JSON.stringify(monitors[0]?.assignmentHistory?.[0], null, 2));
     } else {
       totalItems = await Monitor.countDocuments(query);
       monitors = await Monitor.find(query)
@@ -78,8 +94,6 @@ exports.getMonitors = async (req, res) => {
         .populate('assignmentHistory.revokedBy', 'fullname email')
         .lean();
       monitors = ensureFullnameInHistory(monitors);
-      console.log('🔍 [DEBUG] getMonitors - non-search path, after ensureFullnameInHistory:');
-      console.log('  First monitor:', JSON.stringify(monitors[0]?.assignmentHistory?.[0], null, 2));
     }
     const populatedMonitors = monitors.map((m) => ({
       ...m,
