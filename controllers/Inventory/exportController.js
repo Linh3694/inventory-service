@@ -294,7 +294,7 @@ exports.getImportTemplate = (deviceType) => async (req, res) => {
     const typeColIndex = columns.findIndex(c => c.key === 'type') + 1;
     if (typeColIndex > 0) {
       let typeEnum = null;
-      if (deviceType === 'laptop') typeEnum = '"Laptop,Desktop"';
+      if (deviceType === 'laptop') typeEnum = '"Laptop,Desktop,Tablet"';
       else if (deviceType === 'printer') typeEnum = '"Máy in Màu,Máy in Đen trắng,Máy Scan,Máy Photocopier,Máy đa chức năng"';
       else if (deviceType === 'projector') typeEnum = '"Máy chiếu,Tivi,Màn hình tương tác"';
 
@@ -358,7 +358,7 @@ exports.getImportTemplate = (deviceType) => async (req, res) => {
 
 function getTypeNote(deviceType) {
   switch (deviceType) {
-    case 'laptop': return 'Laptop hoặc Desktop';
+    case 'laptop': return 'Laptop / Desktop / Tablet';
     case 'printer': return 'Máy in Màu / Máy in Đen trắng / Máy Scan / Máy Photocopier / Máy đa chức năng';
     case 'projector': return 'Máy chiếu / Tivi / Màn hình tương tác';
     default: return '';

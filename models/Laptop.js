@@ -17,7 +17,7 @@ const assignmentHistorySchema = new mongoose.Schema({
 const laptopSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
-    type: { type: String, enum: ['Laptop', 'Desktop'], default: 'Laptop' },
+    type: { type: String, enum: ['Laptop', 'Desktop', 'Tablet'], default: 'Laptop' },
     manufacturer: { type: String },
     serial: { type: String, required: true },
     releaseYear: { type: Number },
