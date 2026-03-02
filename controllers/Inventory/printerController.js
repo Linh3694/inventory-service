@@ -247,7 +247,10 @@ exports.bulkUploadPrinters = async (req, res) => {
         errors.push({ serial: printer.serial || 'Không xác định', message: error.message || 'Lỗi không xác định khi xử lý printer.' });
       }
     }
-    if (validPrinters.length > 0) await Printer.insertMany(validPrinters);
+    if (validPrinters.length > 0) {
+      await Printer.insertMany(validPrinters);
+      await redisService.deleteDeviceCache('printer');
+    }
     res.status(201).json({ message: 'Thêm mới hàng loạt thành công!', addedPrinters: validPrinters.length, errors });
   } catch (error) {
     console.error('Lỗi khi thêm mới hàng loạt:', error.message);

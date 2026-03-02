@@ -447,6 +447,7 @@ exports.bulkUploadLaptops = async (req, res) => {
 
     if (validDocs.length > 0) {
       await Laptop.insertMany(validDocs);
+      await redisService.deleteDeviceCache('laptop');
     }
 
     return res.status(201).json({ message: 'Thêm mới hàng loạt thành công!', addedLaptops: validDocs.length, errors });

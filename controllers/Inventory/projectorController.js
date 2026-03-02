@@ -215,7 +215,10 @@ exports.bulkUploadProjectors = async (req, res) => {
         errors.push({ serial: projector.serial || 'Không xác định', message: error.message || 'Lỗi không xác định khi xử lý projector.' });
       }
     }
-    if (validProjectors.length > 0) await Projector.insertMany(validProjectors);
+    if (validProjectors.length > 0) {
+      await Projector.insertMany(validProjectors);
+      await redisService.deleteDeviceCache('projector');
+    }
     res.status(201).json({ message: 'Thêm mới hàng loạt thành công!', addedProjectors: validProjectors.length, errors });
   } catch (error) {
     console.error('Lỗi khi thêm mới hàng loạt:', error.message);

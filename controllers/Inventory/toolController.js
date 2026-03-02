@@ -196,7 +196,10 @@ exports.bulkUploadTools = async (req, res) => {
         errors.push({ serial: tool.serial || 'Không xác định', message: error.message || 'Lỗi không xác định khi xử lý tool.' });
       }
     }
-    if (validTools.length > 0) await Tool.insertMany(validTools);
+    if (validTools.length > 0) {
+      await Tool.insertMany(validTools);
+      await redisService.deleteDeviceCache('tool');
+    }
     res.status(201).json({ message: 'Thêm mới hàng loạt thành công!', addedTools: validTools.length, errors });
   } catch (error) {
     console.error('Lỗi khi thêm mới hàng loạt:', error.message);

@@ -269,7 +269,10 @@ exports.bulkUploadMonitors = async (req, res) => {
         errors.push({ serial: monitor.serial || 'Không xác định', message: error.message || 'Lỗi không xác định khi xử lý monitor.' });
       }
     }
-    if (validMonitors.length > 0) await Monitor.insertMany(validMonitors);
+    if (validMonitors.length > 0) {
+      await Monitor.insertMany(validMonitors);
+      await redisService.deleteDeviceCache('monitor');
+    }
     res.status(201).json({ message: 'Thêm mới hàng loạt thành công!', addedMonitors: validMonitors.length, errors });
   } catch (error) {
     console.error('Lỗi khi thêm mới hàng loạt:', error.message);
