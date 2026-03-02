@@ -325,6 +325,74 @@ exports.revokePhone = async (req, res) => {
   }
 };
 
+// Bulk upload phones
+exports.bulkUploadPhones = async (req, res) => {
+  try {
+    const { phones } = req.body;
+    if (!phones || !Array.isArray(phones) || phones.length === 0) {
+      return res.status(400).json({ message: 'Không có dữ liệu hợp lệ để tải lên!' });
+    }
+    const errors = [];
+    const validPhones = [];
+    for (const phone of phones) {
+      try {
+        phone.room = phone.room && mongoose.Types.ObjectId.isValid(phone.room) ? phone.room : null;
+        phone.status = ['Active', 'Standby', 'Broken', 'PendingDocumentation'].includes(phone.status)
+          ? phone.status : 'Standby';
+
+        if (phone.assigned && Array.isArray(phone.assigned) && phone.assigned.length > 0) {
+          const isId = mongoose.Types.ObjectId.isValid(phone.assigned[0]);
+          if (isId) {
+            const validIds = await User.find({ _id: { $in: phone.assigned } }).select('_id');
+            if (validIds.length !== phone.assigned.length) throw new Error('Một số ID người dùng không tồn tại trong hệ thống.');
+          } else {
+            const assignedIds = await Promise.all(
+              phone.assigned.map(async (fullname) => {
+                const user = await User.findOne({ fullname: fullname.trim() }).select('_id');
+                if (!user) throw new Error(`Người dùng "${fullname}" không tồn tại trong hệ thống.`);
+                return user._id;
+              })
+            );
+            phone.assigned = assignedIds;
+          }
+        }
+
+        if (!phone.name || !phone.serial || !phone.imei1) {
+          errors.push({
+            serial: phone.serial || 'Không xác định',
+            message: 'Thông tin phone không hợp lệ (thiếu tên, serial hoặc IMEI 1).'
+          });
+          continue;
+        }
+
+        const existing = await Phone.findOne({ $or: [{ serial: phone.serial }, { imei1: phone.imei1 }] });
+        if (existing) {
+          errors.push({
+            serial: phone.serial,
+            name: phone.name,
+            message: `Serial ${phone.serial} hoặc IMEI1 ${phone.imei1} đã tồn tại.`
+          });
+          continue;
+        }
+
+        validPhones.push(phone);
+      } catch (err) {
+        errors.push({ serial: phone.serial || 'Không xác định', message: err.message || 'Lỗi không xác định khi xử lý phone.' });
+      }
+    }
+
+    if (validPhones.length > 0) {
+      await Phone.insertMany(validPhones);
+      await redisService.deleteDeviceCache('phone');
+    }
+
+    return res.status(201).json({ message: 'Thêm mới hàng loạt thành công!', addedPhones: validPhones.length, errors });
+  } catch (error) {
+    console.error('Lỗi khi thêm mới hàng loạt phones:', error.message);
+    return res.status(500).json({ message: 'Lỗi khi thêm mới hàng loạt', error: error.message });
+  }
+};
+
 exports.updatePhoneStatus = async (req, res) => {
   try {
     const { id } = req.params;

@@ -17,6 +17,7 @@ const {
   getMonitorFilters,
 } = require('../../controllers/Inventory/monitorController');
 
+const { exportDevices, getImportTemplate } = require('../../controllers/Inventory/exportController');
 const { authenticateServiceOrUser, optionalAuth } = require('../../middleware/validateToken');
 const { upload, processFile } = require('../../middleware/uploadHandover');
 
@@ -24,6 +25,8 @@ const { upload, processFile } = require('../../middleware/uploadHandover');
 router.get('/', optionalAuth, getMonitors);
 router.get('/filters', optionalAuth, getMonitorFilters);
 router.get('/statistics', optionalAuth, getMonitorStatistics);
+router.get('/export', optionalAuth, exportDevices('monitor'));
+router.get('/import-template', optionalAuth, getImportTemplate('monitor'));
 router.get('/:id', optionalAuth, getMonitorById);
 
 // Protected writes

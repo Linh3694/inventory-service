@@ -17,6 +17,7 @@ const {
   getProjectorFilters,
 } = require('../../controllers/Inventory/projectorController');
 
+const { exportDevices, getImportTemplate } = require('../../controllers/Inventory/exportController');
 const { authenticateServiceOrUser, optionalAuth } = require('../../middleware/validateToken');
 const { upload, processFile } = require('../../middleware/uploadHandover');
 
@@ -24,6 +25,8 @@ const { upload, processFile } = require('../../middleware/uploadHandover');
 router.get('/', optionalAuth, getProjectors);
 router.get('/filters', optionalAuth, getProjectorFilters);
 router.get('/statistics', optionalAuth, getProjectorStatistics);
+router.get('/export', optionalAuth, exportDevices('projector'));
+router.get('/import-template', optionalAuth, getImportTemplate('projector'));
 router.get('/:id', optionalAuth, getProjectorById);
 
 // Protected writes

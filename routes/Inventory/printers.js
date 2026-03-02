@@ -17,6 +17,7 @@ const {
   getPrinterFilters,
 } = require('../../controllers/Inventory/printerController');
 
+const { exportDevices, getImportTemplate } = require('../../controllers/Inventory/exportController');
 const { authenticateServiceOrUser, optionalAuth } = require('../../middleware/validateToken');
 const { upload, processFile } = require('../../middleware/uploadHandover');
 
@@ -24,6 +25,8 @@ const { upload, processFile } = require('../../middleware/uploadHandover');
 router.get('/', optionalAuth, getPrinters);
 router.get('/filters', optionalAuth, getPrinterFilters);
 router.get('/statistics', optionalAuth, getPrinterStatistics);
+router.get('/export', optionalAuth, exportDevices('printer'));
+router.get('/import-template', optionalAuth, getImportTemplate('printer'));
 router.get('/:id', optionalAuth, getPrinterById);
 
 // Protected writes

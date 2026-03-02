@@ -18,6 +18,7 @@ const {
   getLaptopFilters,
 } = require('../../controllers/Inventory/laptopController');
 
+const { exportDevices, getImportTemplate } = require('../../controllers/Inventory/exportController');
 const { authenticate, authenticateServiceOrUser, optionalAuth } = require('../../middleware/validateToken');
 const { upload, processFile } = require('../../middleware/uploadHandover');
 
@@ -25,6 +26,8 @@ const { upload, processFile } = require('../../middleware/uploadHandover');
 router.get('/', optionalAuth, getLaptops);
 router.get('/filters', optionalAuth, getLaptopFilters);
 router.get('/statistics', optionalAuth, getLaptopStatistics);
+router.get('/export', optionalAuth, exportDevices('laptop'));
+router.get('/import-template', optionalAuth, getImportTemplate('laptop'));
 router.get('/:id', optionalAuth, getLaptopById);
 
 // Protected write endpoints (user or service token)

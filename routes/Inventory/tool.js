@@ -17,6 +17,7 @@ const {
   getToolFilters,
 } = require('../../controllers/Inventory/toolController');
 
+const { exportDevices, getImportTemplate } = require('../../controllers/Inventory/exportController');
 const { authenticateServiceOrUser, optionalAuth } = require('../../middleware/validateToken');
 const { upload, processFile } = require('../../middleware/uploadHandover');
 
@@ -24,6 +25,8 @@ const { upload, processFile } = require('../../middleware/uploadHandover');
 router.get('/', optionalAuth, getTools);
 router.get('/filters', optionalAuth, getToolFilters);
 router.get('/statistics', optionalAuth, getToolStatistics);
+router.get('/export', optionalAuth, exportDevices('tool'));
+router.get('/import-template', optionalAuth, getImportTemplate('tool'));
 router.get('/:id', optionalAuth, getToolById);
 
 // Protected writes
